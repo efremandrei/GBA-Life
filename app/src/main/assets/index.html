@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18263a">
+  <title>Kaplan Quest — Petah Tiqwa adventure</title>
+  <script>if (new URLSearchParams(location.search).has('android')) document.documentElement.classList.add('android');</script>
+  <link rel="stylesheet" href="style.css">
+  <script src="game.js" defer></script>
+</head>
+<body>
+  <main class="layout">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Petah Tiqwa · pocket adventure</p>
+        <h1>Kaplan Quest</h1>
+      </div>
+      <div class="top-actions">
+        <button id="themeButton" class="small-button" type="button" aria-label="Switch to light skin">☀</button>
+        <button id="soundButton" class="small-button" type="button" aria-label="Turn sound on">♪ Off</button>
+        <button id="aboutButton" class="small-button" type="button">About</button>
+      </div>
+    </header>
+
+    <section class="console" aria-label="Playable map game">
+      <div class="screen-wrap">
+        <canvas id="game" width="640" height="480" tabindex="0" aria-label="Explore the map using arrow keys, WASD, or the touch controls"></canvas>
+        <div id="startOverlay" class="overlay">
+          <div class="overlay-card">
+            <span class="tag">NEW ADVENTURE</span>
+            <h2>Walk to Kaplan School</h2>
+            <p>Explore a pixel-art Petah Tiqwa route, collect three street markers, and face two original neighborhood creatures.</p>
+            <button id="startButton" class="primary-button" type="button">Start adventure</button>
+            <button id="continueButton" class="secondary-button hidden" type="button">Continue saved game</button>
+            <p class="overlay-hint">Arrow keys or WASD to move · E, Enter, or Space to interact</p>
+          </div>
+        </div>
+        <div id="winOverlay" class="overlay hidden" aria-live="polite">
+          <div class="overlay-card">
+            <span class="tag">QUEST COMPLETE</span>
+            <h2>You reached Kaplan School!</h2>
+            <p>All three route markers collected. The journey from Home to the school is complete.</p>
+            <button id="playAgainButton" class="primary-button" type="button">Play again</button>
+          </div>
+        </div>
+        <div id="battleOverlay" class="overlay hidden" aria-live="polite">
+          <div class="overlay-card battle-card">
+            <span class="tag">STREET ENCOUNTER</span>
+            <h2 id="battleName">A creature appeared!</h2>
+            <canvas id="battleArt" width="240" height="110" aria-hidden="true"></canvas>
+            <div class="battle-stats"><span id="heroHp">Buddy HP 24/24</span><span id="enemyHp">Wild HP 14/14</span></div>
+            <p id="battleMessage">Choose a move.</p>
+            <div class="battle-actions">
+              <button id="attackButton" class="primary-button" type="button">A · Strike</button>
+              <button id="healButton" class="secondary-button" type="button">Snack ×2</button>
+            </div>
+          </div>
+        </div>
+        <div id="aboutOverlay" class="overlay hidden">
+          <div class="overlay-card">
+            <span class="tag">ABOUT</span>
+            <h2>Kaplan Quest</h2>
+            <p>Version 0.1.0 (build 1). An original pixel-art walking adventure inspired by classic handheld RPGs. The map is an artistic interpretation of a Petah Tiqwa route.</p>
+            <p>Created for Andrei Efremuahkin · andrei.efr@gmail.com</p>
+            <p id="repoLine">Repository: https://github.com/efremandrei/GBA-Life</p>
+            <button id="closeAboutButton" class="primary-button" type="button">Close</button>
+          </div>
+        </div>
+      </div>
+      <div class="console-bottom">
+        <div class="speaker" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        <span class="console-label">MAP ADVENTURE · 01</span>
+      </div>
+    </section>
+
+    <section class="quest-strip" aria-label="Adventure status"><span id="questStatus">3 street markers to find</span><span id="partnerStatus">Buddy HP 24/24</span></section>
+    <section class="controls" aria-label="Game controls">
+      <div class="dpad" aria-label="Direction controls">
+        <button class="dir up" data-dir="up" aria-label="Move up">▲</button>
+        <button class="dir left" data-dir="left" aria-label="Move left">◀</button>
+        <span class="dpad-center" aria-hidden="true"></span>
+        <button class="dir right" data-dir="right" aria-label="Move right">▶</button>
+        <button class="dir down" data-dir="down" aria-label="Move down">▼</button>
+      </div>
+      <div class="action-area">
+        <button id="actionButton" class="action-button" type="button" aria-label="Interact">A</button>
+        <span>INTERACT</span>
+      </div>
+    </section>
+    <div class="bottom-actions"><button id="restartButton" class="small-button" type="button">New game</button><span>Progress saves automatically</span></div>
+    <p class="help">Follow Khen Street to Tsahal Street, then north along Ha-Tso'arim Street to Kaplan Elementary School. The gold markers light the way.</p>
+  </main>
+</body>
+</html>

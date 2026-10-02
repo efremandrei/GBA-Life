@@ -1,0 +1,10 @@
+.gradle/
+build/
+app/build/
+local.properties
+*.keystore
+keystore.properties
+*.apk
+*.zip
+/preview_*.png
+/emulator_*.png

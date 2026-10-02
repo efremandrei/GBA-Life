@@ -1,0 +1,36 @@
+plugins { id 'com.android.application' }
+
+def signingProps = new Properties()
+def signingFile = rootProject.file('keystore.properties')
+if (signingFile.exists()) signingProps.load(new FileInputStream(signingFile))
+
+android {
+    namespace 'com.efremandrei.kaplanquest'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.efremandrei.kaplanquest'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+    }
+
+    signingConfigs {
+        if (signingFile.exists()) {
+            release {
+                storeFile rootProject.file(signingProps['storeFile'])
+                storePassword signingProps['storePassword']
+                keyAlias signingProps['keyAlias']
+                keyPassword signingProps['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (signingFile.exists()) signingConfig signingConfigs.release
+        }
+    }
+}
