@@ -35,6 +35,12 @@
   const particles = [];
   const SAVE_KEY = "kaplan-quest-save-v2";
   const OLD_SAVE_KEY = "kaplan-quest-save-v1";
+  const MAP_KEY = "kaplan-quest-map-edits-v1";
+  let mapEdits = new Map();
+  try {
+    const stored = localStorage.getItem(MAP_KEY);
+    if (stored) mapEdits = MapGrid.parse(stored, WORLD_W, WORLD_H);
+  } catch (_error) { mapEdits = new Map(); }
   const creatures = [
     { name: "Shrubbit", colors: ["#285e43", "#65ae65", "#b8df79"], hp: 13 },
     { name: "Sparkpup", colors: ["#755334", "#e2a84f", "#ffe18a"], hp: 17 },
@@ -63,6 +69,7 @@
   const continueButton = document.getElementById("continueButton");
   const overview = document.getElementById("overviewMap");
   const overviewCtx = overview.getContext("2d");
+  const mapStatus = document.getElementById("mapStatus");
   const skinColors = ["#f2bd8b", "#dc9b70", "#ad704f", "#744b3f"];
   const hairColors = ["#272d37", "#463729", "#73523c", "#b9864f", "#d1b66d"];
   const shirtColors = ["#c95659", "#4f88a5", "#e1a348", "#6b9d74", "#8b75a4", "#dad06c"];
@@ -203,6 +210,10 @@
   }
   function isOpenPoint(x, y) {
     if (!walkBits.length || x < 3 || y < 3 || x > WORLD_W - 3 || y > WORLD_H - 3) return false;
+    const tileX = Math.floor(x / MapGrid.tileSize);
+    const tileY = Math.floor(y / MapGrid.tileSize);
+    const override = mapEdits.get(tileY * (WORLD_W / MapGrid.tileSize) + tileX);
+    if (override) return MapGrid.walkable.has(override);
     const mx = Math.floor(x / town.maskScale);
     const my = Math.floor(y / town.maskScale);
     const index = my * town.maskWidth + mx;
@@ -513,6 +524,13 @@
     if (!map.complete || !map.naturalWidth) return;
     overviewCtx.imageSmoothingEnabled = false;
     overviewCtx.drawImage(map, 0, 0, overview.width, overview.height);
+    for (const [index, type] of mapEdits) {
+      const cols = WORLD_W / MapGrid.tileSize;
+      const worldX = index % cols * MapGrid.tileSize;
+      const worldY = Math.floor(index / cols) * MapGrid.tileSize;
+      MapGrid.drawTile(overviewCtx, type, worldX / WORLD_W * overview.width,
+        worldY / WORLD_H * overview.height, MapGrid.tileSize / WORLD_W * overview.width);
+    }
     const point = (x, y, color, radius) => {
       const px = x / WORLD_W * overview.width;
       const py = y / WORLD_H * overview.height;
@@ -532,6 +550,33 @@
     mapOverlay.classList.remove("hidden");
   }
   function closeMap() { mapOverlay.classList.add("hidden"); }
+  function setMapStatus(text) { mapStatus.textContent = text; }
+  function applyEditedMap(json) {
+    const previous = mapEdits;
+    try {
+      const parsed = MapGrid.parse(json, WORLD_W, WORLD_H);
+      mapEdits = parsed;
+      const anchors = [town.start, town.school, ...town.markers.map(marker => marker.point)];
+      if (!anchors.every(([x, y]) => canStand(x, y)))
+        throw new Error("The starting point, school, and markers must remain walkable.");
+      localStorage.setItem(MAP_KEY, MapGrid.serialize(mapEdits, WORLD_W, WORLD_H));
+      if (!canStand(player.x, player.y)) {
+        player.x = town.start[0]; player.y = town.start[1];
+        camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
+        camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
+        save();
+      }
+      setMapStatus(`Edited map · ${mapEdits.size} blocks applied`);
+      drawOverview();
+      say(`Edited map loaded: ${mapEdits.size} blocks.`, 4);
+      return true;
+    } catch (error) {
+      mapEdits = previous;
+      setMapStatus(error.message || "Map import failed.");
+      return false;
+    }
+  }
+  window.kaplanApplyMap = applyEditedMap;
   function drawPlayer() {
     const x = Math.round(player.x - camera.x);
     const y = Math.round(player.y - camera.y);
@@ -583,6 +628,17 @@
       ctx.fillStyle = "#91bb92";
       ctx.fillRect(0, 0, W, H);
     }
+    const cols = WORLD_W / MapGrid.tileSize;
+    const firstX = Math.max(0, Math.floor(camera.x / MapGrid.tileSize));
+    const lastX = Math.min(cols - 1, Math.ceil((camera.x + W) / MapGrid.tileSize));
+    const firstY = Math.max(0, Math.floor(camera.y / MapGrid.tileSize));
+    const lastY = Math.min(WORLD_H / MapGrid.tileSize - 1,
+      Math.ceil((camera.y + H) / MapGrid.tileSize));
+    for (let tileY = firstY; tileY <= lastY; tileY++) for (let tileX = firstX; tileX <= lastX; tileX++) {
+      const type = mapEdits.get(tileY * cols + tileX);
+      if (type) MapGrid.drawTile(ctx, type,
+        tileX * MapGrid.tileSize - camera.x, tileY * MapGrid.tileSize - camera.y);
+    }
     // A subtle prompt remains over the destination door.
     if (foundCount() === 3) {
       const sx = Math.round(school.x - camera.x);
@@ -596,7 +652,7 @@
       ctx.fillStyle = p.life > 0.35 ? "#fffbb6" : "#f8b94d";
       ctx.fillRect(Math.round(p.x - camera.x), Math.round(p.y - camera.y), 5, 5);
     }
-    for (const person of people) drawPerson(person);
+    for (const person of people) if (isOpenPoint(person.x, person.y)) drawPerson(person);
     drawPlayer();
     panel(12, 12, 211, 39);
     ctx.fillStyle = "#25364b";
@@ -687,6 +743,31 @@
   });
   document.getElementById("mapButton").addEventListener("click", openMap);
   document.getElementById("closeMapButton").addEventListener("click", closeMap);
+  const mapFileInput = document.getElementById("mapFileInput");
+  document.getElementById("importMapButton").addEventListener("click", () => {
+    if (window.NativeGame?.importMap) window.NativeGame.importMap();
+    else mapFileInput.click();
+  });
+  mapFileInput.addEventListener("change", async () => {
+    const file = mapFileInput.files?.[0];
+    if (file) {
+      if (file.size > 1000000) setMapStatus("Map file is too large.");
+      else applyEditedMap(await file.text());
+    }
+    mapFileInput.value = "";
+  });
+  document.getElementById("originalMapButton").addEventListener("click", () => {
+    mapEdits = new Map();
+    try { localStorage.removeItem(MAP_KEY); } catch (_error) { /* Session only. */ }
+    setMapStatus("Original map restored");
+    if (!canStand(player.x, player.y)) {
+      player.x = town.start[0]; player.y = town.start[1];
+      camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
+      camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
+      save();
+    }
+    drawOverview();
+  });
   soundButton.addEventListener("click", () => {
     audio = !audio;
     soundButton.textContent = `♪ ${audio ? "On" : "Off"}`;
@@ -708,6 +789,7 @@
     try { localStorage.setItem("kaplan-quest-theme", theme); } catch (_error) { /* Keep current session theme. */ }
   });
   if (savedGame()) document.getElementById("continueButton").classList.remove("hidden");
+  if (mapEdits.size) setMapStatus(`Edited map · ${mapEdits.size} blocks applied`);
   updateStatus();
   window.kaplanAction = interact;
   window.kaplanBack = () => {
@@ -737,6 +819,7 @@
       mapLoaded: map.complete && map.naturalWidth > 0,
       maskLoaded: !!walkBits.length, peopleCount: people.length, peopleSeed,
       mapOpen: !mapOverlay.classList.contains("hidden"),
+      mapEdits: mapEdits.size,
       message,
     });
     window.__siteSTest = {
@@ -750,6 +833,7 @@
       nearestPeople: () => people.filter(person => distance(person.x, person.y, player.x, player.y) < 320).length,
       firstPerson: () => people.length ? { x: people[0].x, y: people[0].y,
         name: people[0].name } : null,
+      isWalkable: (x, y) => isOpenPoint(x, y),
     };
   }
   requestAnimationFrame(tick);

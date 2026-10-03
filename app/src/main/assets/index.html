@@ -8,6 +8,7 @@
   <script>if (new URLSearchParams(location.search).has('android')) document.documentElement.classList.add('android');</script>
   <link rel="stylesheet" href="style.css">
   <script src="town_data.js" defer></script>
+  <script src="map_grid.js" defer></script>
   <script src="game.js" defer></script>
 </head>
 <body>
@@ -62,7 +63,7 @@
           <div class="overlay-card about-card">
             <span class="tag">ABOUT</span>
             <h2>Kaplan Quest</h2>
-            <p>Version 0.2.0 (build 2). Original pixel-art walking adventure. Real street layout: © OpenStreetMap contributors (ODbL), checked against Google Maps. Buildings and scenery are stylized.</p>
+            <p>Version 0.3.0 (build 3). Original pixel-art walking adventure with editable map imports. Real street layout: © OpenStreetMap contributors (ODbL), checked against Google Maps. Buildings and scenery are stylized.</p>
             <p>Created for Andrei Efremuahkin · andrei.efr@gmail.com</p>
             <p id="repoLine">Repository: https://github.com/efremandrei/GBA-Life</p>
             <button id="closeAboutButton" class="primary-button" type="button">Close</button>
@@ -71,7 +72,7 @@
       </div>
       <div class="console-bottom">
         <div class="speaker" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-        <span class="console-label">MAP ADVENTURE · 02</span>
+        <span class="console-label">MAP ADVENTURE · 03</span>
       </div>
     </section>
 
@@ -89,7 +90,8 @@
         <span>INTERACT</span>
       </div>
     </section>
-    <div class="bottom-actions"><div class="bottom-buttons"><button id="restartButton" class="small-button" type="button">New game</button><button id="mapButton" class="small-button" type="button">Town map</button></div><span>Progress saves automatically</span></div>
+    <div class="bottom-actions"><div class="bottom-buttons"><button id="restartButton" class="small-button" type="button">New game</button><button id="mapButton" class="small-button" type="button">Town map</button><button id="importMapButton" class="small-button" type="button">Import edited map</button><button id="originalMapButton" class="small-button" type="button">Original map</button></div><span id="mapStatus">Original map · progress saves automatically</span></div>
+    <input id="mapFileInput" type="file" accept=".json,application/json" class="hidden" aria-label="Choose edited map JSON">
     <p class="help">Start near Khen Street. Find the Tzahal and HaTsoarim markers, then enter Kaplan School. Press A near townspeople to talk.</p>
     <div id="mapOverlay" class="map-overlay hidden" role="dialog" aria-modal="true" aria-label="Petah Tikva town map">
       <div class="map-card">

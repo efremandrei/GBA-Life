@@ -12,6 +12,7 @@ import json
 import base64
 import math
 import random
+import shutil
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -244,6 +245,17 @@ def main() -> None:
     (ASSETS / "town_data.js").write_text(
         "window.TOWN_DATA = " + json.dumps(town, separators=(",", ":")) + ";\n",
         encoding="utf-8")
+    editor_assets = ROOT / "editor" / "src" / "main" / "assets"
+    if editor_assets.is_dir():
+        shutil.copyfile(ASSETS / "petah_tikva_town_map.png",
+                        editor_assets / "petah_tikva_town_map.png")
+        shutil.copyfile(ASSETS / "map_grid.js", editor_assets / "map_grid.js")
+        (editor_assets / "editor_config.js").write_text(
+            "window.EDITOR_TOWN = " + json.dumps({
+                "width": WORLD_W, "height": WORLD_H,
+                "start": town["start"], "school": town["school"],
+                "markers": [marker["point"] for marker in town["markers"]],
+            }, separators=(",", ":")) + ";\n", encoding="utf-8")
     print(f"Map {WORLD_W}x{WORLD_H}: {len(roads)} roads, {made} buildings, "
           f"{trees} trees, {len(npc_paths)} NPC paths. School at {town['school']}.")
 

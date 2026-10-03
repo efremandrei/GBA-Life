@@ -5,17 +5,16 @@ def signingFile = rootProject.file('keystore.properties')
 if (signingFile.exists()) signingProps.load(new FileInputStream(signingFile))
 
 android {
-    namespace 'com.efremandrei.kaplanquest'
+    namespace 'com.efremandrei.kaplanquest.editor'
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.efremandrei.kaplanquest'
+        applicationId 'com.efremandrei.kaplanquest.editor'
         minSdk 26
         targetSdk 35
-        versionCode 3
-        versionName '0.3.0'
+        versionCode 1
+        versionName '1.0.0'
     }
-
     signingConfigs {
         if (signingFile.exists()) {
             release {
@@ -26,7 +25,6 @@ android {
             }
         }
     }
-
     buildTypes {
         release {
             minifyEnabled false

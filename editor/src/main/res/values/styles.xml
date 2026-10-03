@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.PetahEditor" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#101a28</item>
+        <item name="android:navigationBarColor">#101a28</item>
+    </style>
+</resources>
