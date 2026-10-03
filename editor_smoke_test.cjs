@@ -13,7 +13,23 @@ const fs = require('fs');
   const editorUrl = pathToFileURL(path.join(__dirname, 'editor/src/main/assets/editor.html')).href + '?test';
   await page.goto(editorUrl);
   await page.waitForFunction(() => window.__editorDebug?.().mapLoaded);
+  const paletteLayout = await page.evaluate(() => {
+    const map = document.querySelector('#mapCanvas').getBoundingClientRect();
+    const rail = document.querySelector('.tile-sidebar').getBoundingClientRect();
+    const palette = document.querySelector('#palette');
+    return { beside: rail.left >= map.right, scrollable: palette.scrollHeight > palette.clientHeight,
+      count: palette.querySelectorAll('button').length };
+  });
+  if (!paletteLayout.beside || !paletteLayout.scrollable || paletteLayout.count < 16)
+    throw new Error(`Tile sidebar is not beside the map and scrollable: ${JSON.stringify(paletteLayout)}`);
   await page.screenshot({ path: path.join(__dirname, 'docs/editor_preview.png'), fullPage: true });
+  await page.locator('#paletteDown').click();
+  await page.waitForFunction(() => document.querySelector('#palette').scrollTop > 0);
+  await page.locator('#paletteUp').click();
+  await page.locator('[data-tool="fountain"]').click();
+  if ((await page.evaluate(() => window.__editorDebug())).tool !== 'fountain')
+    throw new Error('Scrolled tile choice could not be selected');
+  await page.screenshot({ path: path.join(__dirname, 'docs/editor_sidebar_scrolled.png'), fullPage: true });
   const rect = await page.locator('#mapCanvas').boundingBox();
   const at = (x, y) => ({ x: rect.x + x / 640 * rect.width, y: rect.y + y / 480 * rect.height });
   await page.locator('[data-tool="tree"]').click();

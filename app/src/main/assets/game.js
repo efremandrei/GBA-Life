@@ -809,6 +809,7 @@
     if (ready) drawOverview();
   }
   map.addEventListener("load", assetsReady);
+  MapGrid.whenArtReady(() => { if (map.complete && map.naturalWidth) drawOverview(); });
   assetsReady();
   if (new URLSearchParams(location.search).has("test")) {
     window.__siteSDebug = () => ({

@@ -1,8 +1,19 @@
 (() => {
   "use strict";
   const tileSize = 32;
-  const types = ["grass", "road", "path", "tree", "house", "water"];
-  const walkable = new Set(["road", "path"]);
+  const artSize = 96;
+  const types = ["grass", "road", "path", "plaza", "water", "tree", "shrub",
+    "flowers", "fence", "house", "house_blue", "house_teal", "lamp", "school",
+    "market", "fountain"];
+  const artIndex = Object.fromEntries([
+    "grass", "road", "path", "water", "tree", "shrub", "flowers", "fence",
+    "house", "house_blue", "house_teal", "lamp", "school", "market", "plaza",
+    "fountain"
+  ].map((name, index) => [name, index]));
+  const walkable = new Set(["road", "path", "plaza"]);
+  const art = new Image();
+  art.src = "tile_atlas.png";
+
   function parse(input, width, height) {
     const data = typeof input === "string" ? JSON.parse(input) : input;
     if (!data || data.format !== "kaplan-grid-v1" || data.tileSize !== tileSize ||
@@ -28,39 +39,23 @@
       tiles: [...edits].sort((a, b) => a[0] - b[0]) });
   }
   function drawTile(ctx, type, x, y, size = tileSize) {
-    const unit = size / 8;
-    const box = (bx, by, bw, bh, color) => {
-      ctx.fillStyle = color;
-      ctx.fillRect(x + bx * unit, y + by * unit, bw * unit, bh * unit);
-    };
-    if (type === "grass" || type === "tree" || type === "house") {
-      box(0, 0, 8, 8, "#91c876");
-      box(1, 1, 1, 1, "#b0dc87"); box(6, 5, 1, 1, "#76b66e");
+    const index = artIndex[type];
+    if (index === undefined) return;
+    if (!art.complete || !art.naturalWidth) {
+      ctx.fillStyle = type === "water" ? "#278ece" : type === "road" ? "#b7bec0" :
+        type === "path" || type === "plaza" ? "#d5c8ae" : "#91dc78";
+      ctx.fillRect(x, y, size, size);
+      return;
     }
-    if (type === "road") {
-      box(0, 0, 8, 8, "#748c83");
-      box(0, 1, 8, 6, "#bbc8bd");
-      box(1, 3, 2, 1, "#e1d7b5"); box(5, 3, 2, 1, "#e1d7b5");
-    } else if (type === "path") {
-      box(0, 0, 8, 8, "#a9bc95");
-      box(1, 0, 6, 8, "#d8cba6");
-      box(2, 2, 1, 1, "#eadbb4"); box(5, 5, 1, 1, "#b9aa89");
-    } else if (type === "tree") {
-      box(3, 5, 2, 2, "#765d47");
-      box(2, 2, 5, 4, "#285f48");
-      box(1, 3, 6, 2, "#397951");
-      box(2, 1, 4, 4, "#60a65d");
-      box(2, 2, 2, 1, "#a8d26e");
-    } else if (type === "house") {
-      box(1, 3, 6, 4, "#f0d6a6");
-      box(1, 1, 6, 3, "#40576b");
-      box(2, 1, 4, 1, "#cf775c");
-      box(3, 5, 2, 2, "#795a49");
-    } else if (type === "water") {
-      box(0, 0, 8, 8, "#4e9fa8");
-      box(1, 2, 4, 1, "#83cbd0");
-      box(4, 5, 3, 1, "#83cbd0");
-    }
+    ctx.imageSmoothingEnabled = false;
+    if (index >= 4 && type !== "plaza")
+      ctx.drawImage(art, 0, 0, artSize, artSize, x, y, size, size);
+    ctx.drawImage(art, (index % 4) * artSize, Math.floor(index / 4) * artSize,
+      artSize, artSize, x, y, size, size);
   }
-  window.MapGrid = { tileSize, types, walkable, parse, serialize, drawTile };
+  function whenArtReady(callback) {
+    if (art.complete && art.naturalWidth) callback();
+    else art.addEventListener("load", callback, { once: true });
+  }
+  window.MapGrid = { tileSize, types, walkable, parse, serialize, drawTile, whenArtReady };
 })();

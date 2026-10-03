@@ -23,6 +23,21 @@ BASE_W, BASE_H, SCALE = 2048, 1152, 2
 WORLD_W, WORLD_H = BASE_W * SCALE, BASE_H * SCALE
 SOUTH, WEST, NORTH, EAST = 32.081, 34.858, 32.096, 34.889
 RNG = random.Random(1878)
+TILES = ROOT / "art" / "tiles"
+
+
+def sprite(name: str, width: int, height: int) -> Image.Image:
+    return Image.open(TILES / f"{name}.png").convert("RGBA").resize(
+        (width, height), Image.Resampling.NEAREST)
+
+
+def tile_surface(source: Image.Image, width: int, height: int) -> Image.Image:
+    surface = Image.new("RGB", (width, height))
+    tile = source.convert("RGB")
+    for y in range(0, height, tile.height):
+        for x in range(0, width, tile.width):
+            surface.paste(tile, (x, y))
+    return surface
 
 ROAD_WIDTH = {
     "primary": 22, "primary_link": 16,
@@ -72,18 +87,10 @@ def main() -> None:
     places = [e for e in places_raw["elements"] if e["type"] == "way"
               and len(e.get("geometry", [])) >= 3]
 
-    art = Image.new("RGB", (BASE_W, BASE_H), "#a6d586")
+    art = tile_surface(sprite("grass", 48, 48), BASE_W, BASE_H)
     draw = ImageDraw.Draw(art)
     zone = Image.new("L", (BASE_W, BASE_H), 0)
     zd = ImageDraw.Draw(zone)
-
-    # Small, hard-edged color variation keeps the large land parcels legible
-    # without copying map tiles or smoothing the pixels.
-    for _ in range(31000):
-        x, y = RNG.randrange(BASE_W), RNG.randrange(BASE_H)
-        size = RNG.choice((1, 2, 2, 3, 4))
-        draw.rectangle((x, y, x + size, y + size),
-                       fill=RNG.choice(("#a1ce7f", "#b1db91", "#9acb7e", "#afd88b")))
 
     for place in places:
         tags = place.get("tags", {})
@@ -124,6 +131,21 @@ def main() -> None:
             color = "#bdc8bd"
         draw.line(shape, fill=color, width=ROAD_WIDTH[kind], joint="curve")
 
+    # Pattern the OSM street paths with the reference-inspired stone art.
+    road_surface = Image.new("L", (BASE_W, BASE_H), 0)
+    path_surface = Image.new("L", (BASE_W, BASE_H), 0)
+    rd, pd = ImageDraw.Draw(road_surface), ImageDraw.Draw(path_surface)
+    for road in roads:
+        kind = road["tags"]["highway"]
+        surface_draw = pd if kind in ("footway", "path", "pedestrian", "steps") else rd
+        surface_draw.line(points(road), fill=255, width=ROAD_WIDTH[kind], joint="curve")
+    road_pattern = tile_surface(sprite("road", 64, 64).crop((22, 20, 44, 42)),
+                                BASE_W, BASE_H)
+    path_pattern = tile_surface(sprite("path", 48, 48).crop((12, 12, 36, 36)),
+                                BASE_W, BASE_H)
+    art.paste(road_pattern, (0, 0), road_surface)
+    art.paste(path_pattern, (0, 0), path_surface)
+
     occupied = Image.new("L", (BASE_W, BASE_H), 0)
     od = ImageDraw.Draw(occupied)
     school_area = next(e for e in places if e["id"] == 207885565)
@@ -132,19 +154,20 @@ def main() -> None:
     school_cy = sum(p[1] for p in school_shape) // len(school_shape)
     od.rectangle((school_cx - 58, school_cy - 47, school_cx + 58, school_cy + 47), fill=255)
 
-    roofs = ("#d46c53", "#477ea5", "#4c9b8c", "#c57a53", "#6e8baf")
+    roofs = ("house", "house_blue", "house_teal")
     made = 0
     for _ in range(30000):
         if made >= 950:
             break
         x, y = RNG.randrange(18, BASE_W - 35), RNG.randrange(18, BASE_H - 35)
-        w, h = RNG.randrange(8, 18), RNG.randrange(8, 15)
-        box = (x - 2, y - 2, x + w + 4, y + h + 6)
+        w, h = RNG.randrange(16, 25), RNG.randrange(17, 25)
+        box = (x - 3, y - 3, x + w + 5, y + h + 5)
         if mask.crop(box).getbbox() or occupied.crop(box).getbbox():
             continue
         if zone.getpixel((x + w // 2, y + h // 2)) in (1, 3):
             continue
-        draw_roof(draw, x, y, w, h, RNG.choice(roofs))
+        house = sprite(RNG.choice(roofs), w + 8, h + 8)
+        art.paste(house, (x - 4, y - 4), house)
         od.rectangle(box, fill=255)
         made += 1
 
@@ -153,29 +176,58 @@ def main() -> None:
         if trees >= 1450:
             break
         x, y = RNG.randrange(10, BASE_W - 10), RNG.randrange(10, BASE_H - 10)
-        r = RNG.randrange(3, 7)
+        r = RNG.randrange(6, 11)
         box = (x - r - 1, y - r - 1, x + r + 2, y + r + 4)
         if mask.crop(box).getbbox() or occupied.crop(box).getbbox():
             continue
         if zone.getpixel((x, y)) == 3:
             continue
-        draw_tree(draw, x, y, r)
+        tree = sprite("tree" if RNG.random() < 0.74 else "shrub",
+                      r * 2 + 4, r * 2 + 4)
+        art.paste(tree, (x - r - 2, y - r - 2), tree)
         od.ellipse(box, fill=255)
         trees += 1
 
     # The school is drawn over its OSM campus polygon. Its playable entry joins
     # the southern footpath/HaTsoarim road below the campus.
-    draw.polygon(school_shape, fill="#e7dca3", outline="#8b9e75", width=3)
-    sx, sy = school_cx - 26, school_cy - 13
-    draw_roof(draw, sx, sy, 54, 27, "#bc4e52")
-    draw.rectangle((school_cx - 4, school_cy + 14, school_cx + 4, school_cy + 21),
-                   fill="#725e55")
+    school_mask = Image.new("L", (BASE_W, BASE_H), 0)
+    ImageDraw.Draw(school_mask).polygon(school_shape, fill=255)
+    plaza_pattern = tile_surface(sprite("plaza", 44, 44), BASE_W, BASE_H)
+    art.paste(plaza_pattern, (0, 0), school_mask)
+    draw.line(school_shape + [school_shape[0]], fill="#f3eed5", width=3)
+    school_art = sprite("school", 74, 62)
+    art.paste(school_art, (school_cx - 37, school_cy - 27), school_art)
+    fountain = sprite("fountain", 20, 20)
+    art.paste(fountain, (school_cx - 10, school_cy + 33), fountain)
     door_base = px(32.08952, 34.86965)
     road_base = px(32.08943, 34.86965)
     draw.line((door_base, road_base), fill="#e5d9af", width=9)
     md.line((door_base, road_base), fill=255, width=13)
     md.ellipse((door_base[0] - 11, door_base[1] - 11,
                 door_base[0] + 11, door_base[1] + 11), fill=255)
+
+    # Flower beds and lamps add the small street details seen in the samples.
+    for _ in range(400):
+        x, y = RNG.randrange(12, BASE_W - 12), RNG.randrange(12, BASE_H - 12)
+        box = (x - 5, y - 4, x + 7, y + 7)
+        if mask.crop(box).getbbox() or occupied.crop(box).getbbox() or zone.getpixel((x, y)) == 3:
+            continue
+        flower = sprite("flowers", 12, 12)
+        art.paste(flower, (x - 6, y - 6), flower)
+        od.rectangle(box, fill=255)
+    for road in roads[::18]:
+        road_points = points(road)
+        if not road_points:
+            continue
+        x, y = road_points[len(road_points) // 2]
+        x += 9
+        if not (12 <= x < BASE_W - 12 and 12 <= y < BASE_H - 12):
+            continue
+        box = (x - 3, y - 9, x + 4, y + 9)
+        if occupied.crop(box).getbbox():
+            continue
+        lamp = sprite("lamp", 8, 18)
+        art.paste(lamp, (x - 4, y - 9), lamp)
 
     try:
         font = ImageFont.truetype("C:/Windows/Fonts/consola.ttf", 11)
@@ -193,7 +245,7 @@ def main() -> None:
                        fill="#fff7d6", outline="#344a58", width=2)
         draw.text((x, y), name, font=use_font, fill="#294159")
 
-    label("KAPLAN SCHOOL", 32.09010, 34.86928, True)
+    label("KAPLAN SCHOOL", 32.09028, 34.86928, True)
     label("KHEN ST", 32.08880, 34.87318)
     label("TZAHAL ST", 32.09054, 34.87137)
     label("HATSOARIM ST", 32.08913, 34.86955)

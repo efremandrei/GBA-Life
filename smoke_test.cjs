@@ -26,10 +26,10 @@ const path = require('path');
   if (!(await page.evaluate(() => window.__siteSDebug().message)).startsWith(`${personAfter.name}:`))
     throw new Error('Townsperson did not talk');
   await page.evaluate(([x, y]) => window.__siteSTest.setPlayer(x, y), [beginning.x, beginning.y]);
-  await page.screenshot({ path: path.join(__dirname, 'docs/preview_start_v3.png') });
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_start_v4.png') });
   await page.locator('#mapButton').click();
   if (!await page.locator('#mapOverlay').isVisible()) throw new Error('Town map did not open');
-  await page.screenshot({ path: path.join(__dirname, 'docs/preview_map_v3.png') });
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_map_v4.png') });
   await page.keyboard.press('Escape');
   if (await page.locator('#mapOverlay').isVisible()) throw new Error('Town map did not close');
 
@@ -59,7 +59,7 @@ const path = require('path');
     if (state.markers !== i + 1) throw new Error(`Marker ${i} did not collect`);
     if (state.phase === 'battle') {
       battles++;
-      await page.screenshot({ path: path.join(__dirname, `docs/preview_battle_${battles}_v3.png`) });
+      await page.screenshot({ path: path.join(__dirname, `docs/preview_battle_${battles}_v4.png`) });
       for (let turn = 0; turn < 10; turn++) {
         if ((await page.evaluate(() => window.__siteSDebug())).phase !== 'battle') break;
         await page.locator('#attackButton').click();
@@ -78,7 +78,7 @@ const path = require('path');
   await page.keyboard.press('e');
   await page.waitForTimeout(200);
   const won = await page.locator('#winOverlay').isVisible();
-  await page.screenshot({ path: path.join(__dirname, 'docs/preview_win_v3.png') });
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_win_v4.png') });
   const mobileWidth = await page.evaluate(() => ({ viewport: innerWidth, content: document.documentElement.scrollWidth }));
   await page.locator('#playAgainButton').click();
   const newSeed = await page.evaluate(() => window.__siteSDebug().peopleSeed);

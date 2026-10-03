@@ -199,11 +199,28 @@
       swatchCtx.font = "bold 25px sans-serif";
       swatchCtx.fillText(name === "hand" ? "✥" : "×", 7, 25);
     }
-    button.append(swatch, document.createTextNode(name[0].toUpperCase() + name.slice(1)));
+    const labels = { house: "Red house", house_blue: "Blue house", house_teal: "Teal house" };
+    button.append(swatch, document.createTextNode(labels[name] || name[0].toUpperCase() + name.slice(1)));
     button.addEventListener("click", () => setTool(name));
     palette.append(button);
   }
   setTool(tool);
+  document.getElementById("paletteUp").addEventListener("click", () => {
+    palette.scrollTop -= Math.max(100, palette.clientHeight * 0.8);
+  });
+  document.getElementById("paletteDown").addEventListener("click", () => {
+    palette.scrollTop += Math.max(100, palette.clientHeight * 0.8);
+  });
+  MapGrid.whenArtReady(() => {
+    for (const button of palette.querySelectorAll("button[data-tool]")) {
+      if (!MapGrid.types.includes(button.dataset.tool)) continue;
+      const swatch = button.querySelector("canvas");
+      const swatchCtx = swatch.getContext("2d");
+      swatchCtx.clearRect(0, 0, 32, 32);
+      MapGrid.drawTile(swatchCtx, button.dataset.tool, 0, 0);
+    }
+    draw();
+  });
 
   canvas.addEventListener("pointerdown", event => {
     if (pointer) return;

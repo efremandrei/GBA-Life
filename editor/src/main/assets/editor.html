@@ -18,16 +18,21 @@
       <div class="header-actions"><button id="themeButton" type="button" aria-label="Switch to light skin">☀</button><button id="aboutButton" type="button">About</button></div>
     </header>
     <section class="workspace" aria-label="Editable town map">
-      <div class="canvas-frame"><canvas id="mapCanvas" width="640" height="480" aria-label="Town map grid editor"></canvas></div>
+      <div class="editor-layout">
+        <div class="canvas-frame"><canvas id="mapCanvas" width="640" height="480" aria-label="Town map grid editor"></canvas></div>
+        <aside class="tile-sidebar" aria-label="Scrollable tile palette">
+          <div class="sidebar-title"><strong>TILES</strong><span class="scroll-actions"><button id="paletteUp" type="button" aria-label="Scroll tiles up">▲</button><button id="paletteDown" type="button" aria-label="Scroll tiles down">▼</button></span></div>
+          <div id="palette" class="palette"></div>
+        </aside>
+      </div>
       <div class="view-bar"><span id="position">KAPLAN SCHOOL</span><div><button id="zoomOut" type="button" aria-label="Zoom out">−</button><span id="zoomLabel">200%</span><button id="zoomIn" type="button" aria-label="Zoom in">+</button><button id="schoolButton" type="button">School</button></div></div>
       <canvas id="navigator" width="640" height="360" aria-label="Tap to jump to another part of town"></canvas>
       <p class="hint">Tap or drag to paint. Choose Hand to move. Tap the overview to jump across town.</p>
     </section>
-    <section class="tools" aria-label="Block palette"><div class="section-heading"><h2>Paint blocks</h2><span>32 × 32 pixels</span></div><div id="palette" class="palette"></div></section>
     <section class="actions" aria-label="Edit actions"><button id="undoButton" type="button">↶ Undo</button><button id="redoButton" type="button">↷ Redo</button><button id="clearButton" type="button">Clear edits</button></section>
-    <section class="files" aria-label="Map files"><div><h2>Use your map in the game</h2><p>Export a JSON file here, then choose <strong>Import edited map</strong> in Kaplan Quest. Road and path blocks are walkable.</p></div><div class="file-buttons"><button id="exportButton" class="primary" type="button">Export map</button><button id="importButton" type="button">Import map</button><input id="fileInput" type="file" accept=".json,application/json" hidden></div></section>
+    <section class="files" aria-label="Map files"><div><h2>Use your map in the game</h2><p>Export a JSON file here, then choose <strong>Import edited map</strong> in Kaplan Quest. Road, path, and plaza blocks are walkable.</p></div><div class="file-buttons"><button id="exportButton" class="primary" type="button">Export map</button><button id="importButton" type="button">Import map</button><input id="fileInput" type="file" accept=".json,application/json" hidden></div></section>
     <p id="status" role="status">Map saves on this device as you paint.</p>
-    <div id="aboutOverlay" class="modal hidden" role="dialog" aria-modal="true" aria-label="About Petah Map Editor"><div class="modal-card"><span class="tag">ABOUT</span><h2>Petah Map Editor</h2><p>Version 1.0.0 (build 1). Separate grid editor for Kaplan Quest. Base street geometry © OpenStreetMap contributors (ODbL), visually checked with Google Maps; block art is original.</p><p>Andrei Efremuahkin · andrei.efr@gmail.com</p><p class="break">https://github.com/efremandrei/GBA-Life</p><button id="closeAbout" class="primary" type="button">Close</button></div></div>
+    <div id="aboutOverlay" class="modal hidden" role="dialog" aria-modal="true" aria-label="About Petah Map Editor"><div class="modal-card"><span class="tag">ABOUT</span><h2>Petah Map Editor</h2><p>Version 1.1.0 (build 2). Separate grid editor for Kaplan Quest. Base street geometry © OpenStreetMap contributors (ODbL), visually checked with Google Maps; block art is original.</p><p>Andrei Efremuahkin · andrei.efr@gmail.com</p><p class="break">https://github.com/efremandrei/GBA-Life</p><button id="closeAbout" class="primary" type="button">Close</button></div></div>
   </main>
 </body>
 </html>
