@@ -14,8 +14,6 @@
   const map = new Image();
   map.src = "petah_tikva_town_map.png";
   const walkBits = Uint8Array.from(atob(town.walkBits), character => character.charCodeAt(0));
-  const playerArt = new Image();
-  playerArt.src = "player_avatar_sprite_sheet.png";
   // Crops are aligned to the four transparent sprites generated from the supplied avatar.
   const playerViews = {
     down: [183, 92, 318, 482],
@@ -23,6 +21,28 @@
     left: [186, 660, 320, 492],
     right: [763, 660, 320, 492],
   };
+  const characters = {
+    andrei: { source: "player_avatar_sprite_sheet.png", views: playerViews },
+    maya: { source: "avatar_maya_sprite_sheet.png", views: {
+      down: [198, 80, 320, 510], up: [780, 85, 293, 505],
+      left: [190, 660, 335, 502], right: [732, 660, 350, 502],
+    } },
+    amir: { source: "avatar_amir_sprite_sheet.png", views: {
+      down: [186, 94, 310, 480], up: [769, 93, 313, 480],
+      left: [187, 659, 313, 494], right: [769, 659, 313, 494],
+    } },
+    dana: { source: "avatar_dana_sprite_sheet.png", views: {
+      down: [182, 93, 315, 491], up: [759, 93, 330, 491],
+      left: [187, 660, 313, 499], right: [770, 660, 313, 497],
+    } },
+  };
+  const characterArt = {};
+  for (const [id, character] of Object.entries(characters)) {
+    const image = new Image();
+    image.addEventListener("load", drawCharacterChoices);
+    image.src = character.source;
+    characterArt[id] = image;
+  }
   let W = canvas.width;
   let H = canvas.height;
   const WORLD_W = town.width;
@@ -59,6 +79,8 @@
   let battle = null;
   let saveTimer = 0;
   let phase = "title";
+  let selectedCharacter = "andrei";
+  let characterId = "andrei";
   let lastTime = 0;
   let message = "";
   let messageUntil = 0;
@@ -66,6 +88,8 @@
   let audioContext = null;
 
   const startOverlay = document.getElementById("startOverlay");
+  const splashScreen = document.getElementById("splashScreen");
+  const characterPicker = document.getElementById("characterPicker");
   const winOverlay = document.getElementById("winOverlay");
   const soundButton = document.getElementById("soundButton");
   const themeButton = document.getElementById("themeButton");
@@ -86,6 +110,28 @@
   const shirtColors = ["#c95659", "#4f88a5", "#e1a348", "#6b9d74", "#8b75a4", "#dad06c"];
   const firstNames = ["Noa", "Maya", "Amit", "Lior", "Tamar", "Omer", "Adi", "Roni", "Yael", "Eli", "Dana", "Niv"];
   const chats = ["What a lovely day to walk!", "Have you seen the school?", "The streets are busy today.", "Try the town map if you get lost.", "Good luck on your adventure!", "I like the little park nearby."];
+
+  function drawCharacterChoices() {
+    for (const button of characterPicker.querySelectorAll(".character-choice")) {
+      const id = button.dataset.character;
+      const image = characterArt[id];
+      const preview = button.querySelector("canvas");
+      const previewCtx = preview.getContext("2d");
+      previewCtx.clearRect(0, 0, preview.width, preview.height);
+      if (!image?.complete || !image.naturalWidth) continue;
+      previewCtx.imageSmoothingEnabled = false;
+      previewCtx.drawImage(image, ...characters[id].views.down, 9, 5, 46, 70);
+    }
+  }
+  function selectCharacter(id) {
+    if (!Object.prototype.hasOwnProperty.call(characters, id)) return;
+    selectedCharacter = id;
+    for (const button of characterPicker.querySelectorAll(".character-choice")) {
+      const selected = button.dataset.character === id;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    }
+  }
 
   function seeded(seed) {
     let value = seed >>> 0;
@@ -148,6 +194,7 @@
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
         x: player.x, y: player.y, facing: player.facing,
+        character: characterId,
         markers: markers.map(marker => marker.found),
         hp: buddy.hp, snacks: buddy.snacks, phase,
         battle: battle ? { markerIndex: battle.markerIndex, hp: battle.hp } : null,
@@ -212,6 +259,9 @@
     }
     peopleSeed = Number(state.peopleSeed) || 1878;
     generatePeople(peopleSeed);
+    characterId = Object.prototype.hasOwnProperty.call(characters, state.character)
+      ? state.character : "andrei";
+    selectCharacter(characterId);
     player.facing = playerViews[state.facing] ? state.facing : "down";
     markers.forEach((marker, index) => { marker.found = !!state.markers?.[index]; });
     buddy.hp = clamp(Number(state.hp) || 24, 1, 24);
@@ -302,6 +352,7 @@
   }
   function reset() {
     if (!walkBits.length || !map.naturalWidth) return;
+    characterId = selectedCharacter;
     inside = null;
     openedChests.clear();
     player.x = town.start[0];
@@ -327,6 +378,19 @@
     save();
     say("Collect 3 gold markers, then enter Kaplan School.", 5);
     canvas.focus();
+  }
+  function openCharacterSelect() {
+    if (phase !== "title") save();
+    phase = "title";
+    inside = null;
+    battle = null;
+    keys.clear();
+    touch.clear();
+    battleOverlay.classList.add("hidden");
+    winOverlay.classList.add("hidden");
+    startOverlay.classList.remove("hidden");
+    continueButton.classList.toggle("hidden", !savedGame());
+    closeMenu();
   }
   function isHouseType(type) { return ["house", "house_blue", "house_teal", "high_building"].includes(type); }
   function houseName(id) { return typeof id === "number" ? `House ${id + 1}` : `Custom house ${String(id).replace("edit-", "")}`; }
@@ -435,7 +499,8 @@
       return;
     }
     if (phase === "battle") { attack(); return; }
-    if (phase === "title" || phase === "won") {
+    if (phase === "won") { openCharacterSelect(); return; }
+    if (phase === "title") {
       reset();
       return;
     }
@@ -766,9 +831,10 @@
     ctx.beginPath();
     ctx.ellipse(x, y + 4, 13, 5, 0, 0, Math.PI * 2);
     ctx.fill();
-    if (playerArt.complete && playerArt.naturalWidth) {
-      const [sx, sy, sw, sh] = playerViews[facing];
-      ctx.drawImage(playerArt, sx, sy, sw, sh, x - 19, y - 58 - bob, 38, 58);
+    const art = characterArt[characterId];
+    if (art.complete && art.naturalWidth) {
+      const [sx, sy, sw, sh] = characters[characterId].views[facing];
+      ctx.drawImage(art, sx, sy, sw, sh, x - 19, y - 58 - bob, 38, 58);
       return;
     }
     // Matching code-drawn fallback in case the separate sprite image is missing.
@@ -902,6 +968,7 @@
     KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right",
   };
   window.addEventListener("keydown", event => {
+    if (phase === "title" && event.target instanceof HTMLButtonElement && event.code !== "Escape") return;
     if (event.code === "Escape" && !mapOverlay.classList.contains("hidden")) {
       closeMap(); return;
     }
@@ -948,8 +1015,12 @@
   }
   document.getElementById("startButton").addEventListener("click", reset);
   document.getElementById("continueButton").addEventListener("click", resume);
-  document.getElementById("restartButton").addEventListener("click", reset);
-  document.getElementById("playAgainButton").addEventListener("click", reset);
+  document.getElementById("restartButton").addEventListener("click", openCharacterSelect);
+  document.getElementById("playAgainButton").addEventListener("click", openCharacterSelect);
+  characterPicker.addEventListener("click", event => {
+    const choice = event.target.closest(".character-choice");
+    if (choice) selectCharacter(choice.dataset.character);
+  });
   document.getElementById("actionButton").addEventListener("click", interact);
   document.getElementById("attackButton").addEventListener("click", attack);
   document.getElementById("healButton").addEventListener("click", snack);
@@ -1024,7 +1095,12 @@
     applyTheme(theme);
     try { localStorage.setItem("kaplan-quest-theme", theme); } catch (_error) { /* Keep current session theme. */ }
   });
-  if (savedGame()) document.getElementById("continueButton").classList.remove("hidden");
+  const previousGame = savedGame();
+  if (previousGame) {
+    continueButton.classList.remove("hidden");
+    selectCharacter(previousGame.character || "andrei");
+  }
+  drawCharacterChoices();
   if (mapEdits.size) setMapStatus(`Edited map · ${mapEdits.size} blocks applied`);
   updateStatus();
   window.kaplanAction = interact;
@@ -1071,7 +1147,9 @@
       x: Math.round(player.x), y: Math.round(player.y),
       markers: foundCount(), phase,
       hp: buddy.hp, enemyHp: battle?.hp ?? null,
-      avatarLoaded: playerArt.complete && playerArt.naturalWidth > 0,
+      avatarLoaded: characterArt[characterId].complete && characterArt[characterId].naturalWidth > 0,
+      character: characterId, selectedCharacter,
+      splashVisible: !splashScreen.classList.contains("hidden"),
       mapLoaded: map.complete && map.naturalWidth > 0,
       maskLoaded: !!walkBits.length, peopleCount: people.length, peopleSeed,
       mapOpen: !mapOverlay.classList.contains("hidden"),
@@ -1110,5 +1188,9 @@
       },
     };
   }
+  window.setTimeout(() => {
+    splashScreen.classList.add("dismissed");
+    window.setTimeout(() => splashScreen.classList.add("hidden"), 350);
+  }, 1250);
   requestAnimationFrame(tick);
 })();

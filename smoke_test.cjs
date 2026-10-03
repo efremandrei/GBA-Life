@@ -10,11 +10,19 @@ const path = require('path');
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(pathToFileURL(path.join(__dirname, 'app/src/main/assets/index.html')).href + '?test');
+  if (!await page.locator('#splashScreen').isVisible()) throw new Error('Launch splash did not appear');
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_splash_v8.png') });
+  await page.waitForFunction(() => window.__siteSDebug?.().splashVisible === false);
   await page.waitForFunction(() => window.__siteSDebug?.().mapLoaded && window.__siteSDebug?.().maskLoaded);
+  await page.locator('[data-character="maya"]').click();
+  if (await page.locator('[data-character="maya"]').getAttribute('aria-pressed') !== 'true')
+    throw new Error('Character choice was not selected');
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_characters_v8.png') });
   await page.locator('#startButton').click();
   await page.waitForFunction(() => window.__siteSDebug().avatarLoaded);
   await page.waitForFunction(() => !document.querySelector('.controls').classList.contains('hidden'));
   const beginning = await page.evaluate(() => window.__siteSDebug());
+  if (beginning.character !== 'maya') throw new Error('Selected character was not used in the game');
   if (beginning.peopleCount !== 145 || !beginning.peopleSeed) throw new Error('People were not generated');
   const layout = await page.evaluate(() => {
     const map = document.querySelector('#game').getBoundingClientRect();
@@ -79,13 +87,14 @@ const path = require('path');
   await page.locator('#menuButton').click();
   await page.locator('#exitButton').click();
   const exitSave = await page.evaluate(() => window.__savedAtExit);
-  if (!exitSave || exitSave.interior?.id !== 0 || exitSave.openedChests?.length !== 1 ||
+  if (!exitSave || exitSave.character !== 'maya' || exitSave.interior?.id !== 0 || exitSave.openedChests?.length !== 1 ||
       exitSave.snacks !== 2 || exitSave.phase !== 'playing')
     throw new Error(`Exit did not save before closing: ${JSON.stringify(exitSave)}`);
   await page.reload();
   await page.waitForFunction(() => window.__siteSDebug?.().maskLoaded);
   await page.locator('#continueButton').click();
-  if ((await page.evaluate(() => window.__siteSDebug())).interior !== 0)
+  if ((await page.evaluate(() => window.__siteSDebug())).interior !== 0 ||
+      (await page.evaluate(() => window.__siteSDebug())).character !== 'maya')
     throw new Error('Exit Game save did not restore the house interior');
   await page.keyboard.press('Escape');
   if ((await page.evaluate(() => window.__siteSDebug())).interior !== null) throw new Error('House exit failed');
@@ -214,7 +223,12 @@ const path = require('path');
   await page.screenshot({ path: path.join(__dirname, 'docs/preview_win_v6.png') });
   const mobileWidth = await page.evaluate(() => ({ viewport: innerWidth, content: document.documentElement.scrollWidth }));
   await page.locator('#playAgainButton').click();
+  if (!await page.locator('#startOverlay').isVisible()) throw new Error('Play again did not open character choices');
+  await page.locator('[data-character="amir"]').click();
+  await page.locator('#startButton').click();
   const newSeed = await page.evaluate(() => window.__siteSDebug().peopleSeed);
+  if ((await page.evaluate(() => window.__siteSDebug())).character !== 'amir')
+    throw new Error('New adventure did not use the new character');
   await page.reload();
   await page.waitForFunction(() => window.__siteSDebug?.().mapLoaded);
   await page.evaluate(() => {
@@ -228,9 +242,17 @@ const path = require('path');
   await page.waitForFunction(() => window.__siteSDebug?.().mapLoaded);
   await page.locator('#continueButton').click();
   const migrated = await page.evaluate(() => window.__siteSDebug());
+  await page.locator('#menuButton').click();
+  await page.locator('#restartButton').click();
+  if (!await page.locator('#startOverlay').isVisible()) throw new Error('New game did not open character choices');
+  await page.locator('[data-character="dana"]').click();
+  await page.locator('#startButton').click();
+  await page.waitForFunction(() => window.__siteSDebug().avatarLoaded);
+  const dana = await page.evaluate(() => window.__siteSDebug());
   await browser.close();
   if (errors.length || !won || mobileWidth.content > mobileWidth.viewport || newSeed === beginning.peopleSeed ||
-      migrated.x !== 1958 || migrated.y !== 1195 || migrated.markers !== 1 || migrated.hp !== 17)
-    throw new Error(JSON.stringify({ errors, won, mobileWidth, newSeed, migrated }));
-  console.log('PASS: real-map assets, walking, 145 moving/talking people, map overlay, battles, save/resume, v1 migration, victory, mobile width, no JS errors.');
+      migrated.x !== 1958 || migrated.y !== 1195 || migrated.markers !== 1 || migrated.hp !== 17 ||
+      migrated.character !== 'andrei' || dana.character !== 'dana')
+    throw new Error(JSON.stringify({ errors, won, mobileWidth, newSeed, migrated, dana }));
+  console.log('PASS: splash, four-character selection, sprite save/resume, real-map game, battles, v1 migration, victory, mobile width, no JS errors.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
