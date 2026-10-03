@@ -7,13 +7,14 @@
   <title>Kaplan Quest — Petah Tiqwa adventure</title>
   <script>if (new URLSearchParams(location.search).has('android')) document.documentElement.classList.add('android');</script>
   <link rel="stylesheet" href="style.css">
+  <script src="town_data.js" defer></script>
   <script src="game.js" defer></script>
 </head>
 <body>
   <main class="layout">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Petah Tiqwa · pocket adventure</p>
+        <p class="eyebrow">Petah Tikva · pocket adventure</p>
         <h1>Kaplan Quest</h1>
       </div>
       <div class="top-actions">
@@ -29,8 +30,8 @@
         <div id="startOverlay" class="overlay">
           <div class="overlay-card">
             <span class="tag">NEW ADVENTURE</span>
-            <h2>Walk to Kaplan School</h2>
-            <p>Explore a pixel-art Petah Tiqwa route, collect three street markers, and face two original neighborhood creatures.</p>
+            <h2>Reach Kaplan School</h2>
+            <p>Walk real Petah Tikva streets, meet townspeople, find three markers, and face two original creatures.</p>
             <button id="startButton" class="primary-button" type="button">Start adventure</button>
             <button id="continueButton" class="secondary-button hidden" type="button">Continue saved game</button>
             <p class="overlay-hint">Arrow keys or WASD to move · E, Enter, or Space to interact</p>
@@ -58,10 +59,10 @@
           </div>
         </div>
         <div id="aboutOverlay" class="overlay hidden">
-          <div class="overlay-card">
+          <div class="overlay-card about-card">
             <span class="tag">ABOUT</span>
             <h2>Kaplan Quest</h2>
-            <p>Version 0.1.0 (build 1). An original pixel-art walking adventure inspired by classic handheld RPGs. The map is an artistic interpretation of a Petah Tiqwa route.</p>
+            <p>Version 0.2.0 (build 2). Original pixel-art walking adventure. Real street layout: © OpenStreetMap contributors (ODbL), checked against Google Maps. Buildings and scenery are stylized.</p>
             <p>Created for Andrei Efremuahkin · andrei.efr@gmail.com</p>
             <p id="repoLine">Repository: https://github.com/efremandrei/GBA-Life</p>
             <button id="closeAboutButton" class="primary-button" type="button">Close</button>
@@ -70,7 +71,7 @@
       </div>
       <div class="console-bottom">
         <div class="speaker" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-        <span class="console-label">MAP ADVENTURE · 01</span>
+        <span class="console-label">MAP ADVENTURE · 02</span>
       </div>
     </section>
 
@@ -88,8 +89,16 @@
         <span>INTERACT</span>
       </div>
     </section>
-    <div class="bottom-actions"><button id="restartButton" class="small-button" type="button">New game</button><span>Progress saves automatically</span></div>
-    <p class="help">Follow Khen Street to Tsahal Street, then north along Ha-Tso'arim Street to Kaplan Elementary School. The gold markers light the way.</p>
+    <div class="bottom-actions"><div class="bottom-buttons"><button id="restartButton" class="small-button" type="button">New game</button><button id="mapButton" class="small-button" type="button">Town map</button></div><span>Progress saves automatically</span></div>
+    <p class="help">Start near Khen Street. Find the Tzahal and HaTsoarim markers, then enter Kaplan School. Press A near townspeople to talk.</p>
+    <div id="mapOverlay" class="map-overlay hidden" role="dialog" aria-modal="true" aria-label="Petah Tikva town map">
+      <div class="map-card">
+        <div class="map-heading"><div><p class="eyebrow">REAL STREETS · PIXEL WORLD</p><h2>Petah Tikva</h2></div><button id="closeMapButton" class="small-button" type="button">Close</button></div>
+        <canvas id="overviewMap" width="640" height="360" aria-label="Town overview showing your position, route markers, and school"></canvas>
+        <p>Blue: you · Gold: route markers · Red: Kaplan School</p>
+        <p class="map-credit">Street geometry © OpenStreetMap contributors · visually checked with Google Maps</p>
+      </div>
+    </div>
   </main>
 </body>
 </html>

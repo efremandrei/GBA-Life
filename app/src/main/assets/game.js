@@ -3,8 +3,11 @@
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d", { alpha: false });
+  const town = window.TOWN_DATA;
+  if (!town) throw new Error("Town geometry is missing.");
   const map = new Image();
-  map.src = "gba_town_map.png";
+  map.src = "petah_tikva_town_map.png";
+  const walkBits = Uint8Array.from(atob(town.walkBits), character => character.charCodeAt(0));
   const playerArt = new Image();
   playerArt.src = "player_avatar_sprite_sheet.png";
   // Crops are aligned to the four transparent sprites generated from the supplied avatar.
@@ -16,42 +19,31 @@
   };
   const W = canvas.width;
   const H = canvas.height;
-  const WORLD_W = 1024;
-  const WORLD_H = 1536;
-  const SPEED = 145;
+  const WORLD_W = town.width;
+  const WORLD_H = town.height;
+  const SPEED = 165;
 
-  const walkable = [
-    // Major streets: Kaplan, Ha-Tso'arim, Tsahal, Khen, and the lower street.
-    [0, 102, 918, 185],
-    [313, 118, 391, 610],
-    [0, 565, 916, 642],
-    [530, 594, 610, 1414],
-    [0, 1364, 918, 1440],
-    // Home walkway and the small plaza beside the marked building.
-    [475, 1280, 570, 1378],
-    [372, 371, 444, 442],
-    [396, 359, 609, 529],
-  ];
-  const markers = [
-    { x: 565, y: 990, name: "Khen Street", found: false },
-    { x: 462, y: 604, name: "Tsahal Street", found: false },
-    { x: 351, y: 447, name: "Ha-Tso'arim Street", found: false },
-  ];
-  const school = { x: 490, y: 372 };
-  const player = { x: 488, y: 1326, facing: "down", step: 0 };
-  const camera = { x: 0, y: WORLD_H - H };
+  const markers = town.markers.map(marker => ({
+    x: marker.point[0], y: marker.point[1], name: marker.name, found: false,
+  }));
+  const school = { x: town.school[0], y: town.school[1] };
+  const player = { x: town.start[0], y: town.start[1], facing: "down", step: 0 };
+  const camera = { x: clamp(player.x - W / 2, 0, WORLD_W - W),
+    y: clamp(player.y - H / 2, 0, WORLD_H - H) };
   const keys = new Set();
   const touch = new Set();
   const particles = [];
-  const SAVE_KEY = "kaplan-quest-save-v1";
+  const SAVE_KEY = "kaplan-quest-save-v2";
+  const OLD_SAVE_KEY = "kaplan-quest-save-v1";
   const creatures = [
     { name: "Shrubbit", colors: ["#285e43", "#65ae65", "#b8df79"], hp: 13 },
     { name: "Sparkpup", colors: ["#755334", "#e2a84f", "#ffe18a"], hp: 17 },
   ];
   const buddy = { hp: 24, maxHp: 24, snacks: 2 };
+  const people = [];
+  let peopleSeed = 0;
   let battle = null;
   let saveTimer = 0;
-  let aboutWasOpen = false;
   let phase = "title";
   let lastTime = 0;
   let message = "";
@@ -66,6 +58,73 @@
   const battleOverlay = document.getElementById("battleOverlay");
   const aboutOverlay = document.getElementById("aboutOverlay");
   const battleMessage = document.getElementById("battleMessage");
+  const mapOverlay = document.getElementById("mapOverlay");
+  const startButton = document.getElementById("startButton");
+  const continueButton = document.getElementById("continueButton");
+  const overview = document.getElementById("overviewMap");
+  const overviewCtx = overview.getContext("2d");
+  const skinColors = ["#f2bd8b", "#dc9b70", "#ad704f", "#744b3f"];
+  const hairColors = ["#272d37", "#463729", "#73523c", "#b9864f", "#d1b66d"];
+  const shirtColors = ["#c95659", "#4f88a5", "#e1a348", "#6b9d74", "#8b75a4", "#dad06c"];
+  const firstNames = ["Noa", "Maya", "Amit", "Lior", "Tamar", "Omer", "Adi", "Roni", "Yael", "Eli", "Dana", "Niv"];
+  const chats = ["What a lovely day to walk!", "Have you seen the school?", "The streets are busy today.", "Try the town map if you get lost.", "Good luck on your adventure!", "I like the little park nearby."];
+
+  function seeded(seed) {
+    let value = seed >>> 0;
+    return () => ((value = (1664525 * value + 1013904223) >>> 0) / 4294967296);
+  }
+  function generatePeople(seed) {
+    people.length = 0;
+    const rand = seeded(seed);
+    const paths = town.npcPaths.filter(path => path.length >= 2 && path.every(([x, y]) =>
+      x >= 8 && y >= 8 && x < WORLD_W - 8 && y < WORLD_H - 8));
+    const nearby = paths.filter(path => path.some(([x, y]) =>
+      distance(x, y, town.start[0], town.start[1]) < 600));
+    for (let i = 0; i < 145; i++) {
+      const pool = i < 35 && nearby.length ? nearby : paths;
+      const path = pool[Math.floor(rand() * pool.length)];
+      const segment = Math.floor(rand() * (path.length - 1));
+      const from = path[segment], to = path[segment + 1];
+      const t = rand();
+      people.push({ path, segment, t, direction: rand() < 0.5 ? -1 : 1,
+        x: from[0] + (to[0] - from[0]) * t,
+        y: from[1] + (to[1] - from[1]) * t,
+        speed: 22 + rand() * 25, stride: rand() * 8,
+        skin: skinColors[Math.floor(rand() * skinColors.length)],
+        hair: hairColors[Math.floor(rand() * hairColors.length)],
+        shirt: shirtColors[Math.floor(rand() * shirtColors.length)],
+        pants: rand() < 0.6 ? "#36536f" : "#454b54",
+        accessory: rand() < 0.27 ? "#cc4847" : null,
+        name: firstNames[Math.floor(rand() * firstNames.length)],
+        chat: chats[Math.floor(rand() * chats.length)] });
+    }
+  }
+  function updatePeople(dt) {
+    for (const person of people) {
+      let remaining = person.speed * dt;
+      while (remaining > 0) {
+        const a = person.path[person.segment];
+        const b = person.path[person.segment + 1];
+        const length = Math.max(1, distance(a[0], a[1], b[0], b[1]));
+        const target = person.direction > 0 ? 1 : 0;
+        const fraction = Math.min(Math.abs(target - person.t), remaining / length);
+        person.t += person.direction * fraction;
+        remaining -= fraction * length;
+        if (Math.abs(person.t - target) < 0.00001) {
+          if (person.direction > 0 && person.segment < person.path.length - 2) {
+            person.segment++; person.t = 0;
+          } else if (person.direction < 0 && person.segment > 0) {
+            person.segment--; person.t = 1;
+          } else { person.direction *= -1; }
+        }
+        if (fraction === 0) break;
+      }
+      const a = person.path[person.segment], b = person.path[person.segment + 1];
+      person.x = a[0] + (b[0] - a[0]) * person.t;
+      person.y = a[1] + (b[1] - a[1]) * person.t;
+      person.stride += dt * person.speed / 8;
+    }
+  }
 
   function save() {
     try {
@@ -74,13 +133,22 @@
         markers: markers.map(marker => marker.found),
         hp: buddy.hp, snacks: buddy.snacks, phase,
         battle: battle ? { markerIndex: battle.markerIndex, hp: battle.hp } : null,
+        peopleSeed,
       }));
     } catch (_error) { /* The game remains playable if storage is unavailable. */ }
   }
   function savedGame() {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
-      return raw ? JSON.parse(raw) : null;
+      if (raw) return JSON.parse(raw);
+      const old = localStorage.getItem(OLD_SAVE_KEY);
+      if (!old) return null;
+      const state = JSON.parse(old);
+      // The old artwork used a fictional coordinate system. Preserve quest
+      // progress and Buddy state while relocating the player to real Hen St.
+      return { ...state, x: town.start[0], y: town.start[1],
+        phase: state.phase === "won" ? "won" : "playing", battle: null,
+        peopleSeed: 1878 };
     } catch (_error) { return null; }
   }
   function updateStatus() {
@@ -92,7 +160,11 @@
     if (!state || !Number.isFinite(state.x) || !Number.isFinite(state.y)) return reset();
     player.x = clamp(state.x, 8, WORLD_W - 8);
     player.y = clamp(state.y, 8, WORLD_H - 8);
-    if (!canStand(player.x, player.y)) { player.x = 488; player.y = 1326; }
+    if (!canStand(player.x, player.y)) {
+      player.x = town.start[0]; player.y = town.start[1];
+    }
+    peopleSeed = Number(state.peopleSeed) || 1878;
+    generatePeople(peopleSeed);
     player.facing = playerViews[state.facing] ? state.facing : "down";
     markers.forEach((marker, index) => { marker.found = !!state.markers?.[index]; });
     buddy.hp = clamp(Number(state.hp) || 24, 1, 24);
@@ -115,7 +187,8 @@
       battleOverlay.classList.remove("hidden");
     }
     updateStatus();
-    say("Welcome back to Petah Tiqwa!", 3);
+    say("Welcome back to Petah Tikva!", 3);
+    save();
     canvas.focus();
   }
 
@@ -129,17 +202,14 @@
     return markers.filter(marker => marker.found).length;
   }
   function isOpenPoint(x, y) {
-    if (x < 8 || y < 8 || x > WORLD_W - 8 || y > WORLD_H - 8) return false;
-    const onRoad = walkable.some(([x1, y1, x2, y2]) =>
-      x >= x1 && x <= x2 && y >= y1 && y <= y2);
-    if (!onRoad) return false;
-    // The fountain and red-roof building have solid footprints.
-    if (distance(x, y, 490, 431) < 31) return false;
-    if (x >= 431 && x <= 586 && y >= 345 && y < 369) return false;
-    return true;
+    if (!walkBits.length || x < 3 || y < 3 || x > WORLD_W - 3 || y > WORLD_H - 3) return false;
+    const mx = Math.floor(x / town.maskScale);
+    const my = Math.floor(y / town.maskScale);
+    const index = my * town.maskWidth + mx;
+    return !!(walkBits[index >> 3] & (1 << (index & 7)));
   }
   function canStand(x, y) {
-    return [[0, 0], [-8, 0], [8, 0], [0, -5], [0, 5]]
+    return [[0, 0], [-4, 0], [4, 0], [0, -4], [0, 4]]
       .every(([dx, dy]) => isOpenPoint(x + dx, y + dy));
   }
   function say(text, seconds = 3.5) {
@@ -166,8 +236,9 @@
     }
   }
   function reset() {
-    player.x = 488;
-    player.y = 1326;
+    if (!walkBits.length || !map.naturalWidth) return;
+    player.x = town.start[0];
+    player.y = town.start[1];
     player.facing = "down";
     player.step = 0;
     camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
@@ -175,6 +246,8 @@
     markers.forEach(marker => { marker.found = false; });
     buddy.hp = buddy.maxHp;
     buddy.snacks = 2;
+    peopleSeed = (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
+    generatePeople(peopleSeed);
     battle = null;
     particles.length = 0;
     keys.clear();
@@ -189,6 +262,7 @@
     canvas.focus();
   }
   function interact() {
+    if (!mapOverlay.classList.contains("hidden")) { closeMap(); return; }
     if (!aboutOverlay.classList.contains("hidden")) {
       aboutOverlay.classList.add("hidden");
       return;
@@ -198,7 +272,7 @@
       reset();
       return;
     }
-    if (distance(player.x, player.y, school.x, school.y) < 57) {
+    if (distance(player.x, player.y, school.x, school.y) < 70) {
       if (foundCount() === markers.length) {
         phase = "won";
         winOverlay.classList.remove("hidden");
@@ -210,10 +284,15 @@
         say(`Find ${markers.length - foundCount()} more route marker${markers.length - foundCount() === 1 ? "" : "s"} first.`);
         tone(230, 0.14);
       }
-    } else if (player.y > 1250) {
-      say("Home is here. Head north on Khen Street!");
     } else {
-      say("Follow the gold markers toward Kaplan School.");
+      const nearest = people.reduce((best, person) => {
+        const d = distance(player.x, player.y, person.x, person.y);
+        return d < best.distance ? { person, distance: d } : best;
+      }, { person: null, distance: Infinity });
+      if (nearest.distance < 52) say(`${nearest.person.name}: ${nearest.person.chat}`, 4.5);
+      else if (distance(player.x, player.y, town.start[0], town.start[1]) < 75)
+        say("Khen Street is your starting point. Follow the gold markers!");
+      else say("Follow the gold markers toward Kaplan School.");
     }
   }
   function creatureArt(creature) {
@@ -268,7 +347,8 @@
         battleOverlay.classList.add("hidden");
         battle = null;
         buddy.hp = buddy.maxHp;
-        player.x = 488; player.y = 1326;
+        player.x = town.start[0]; player.y = town.start[1];
+        camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
         camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
         phase = "playing";
         updateStatus(); save();
@@ -320,6 +400,8 @@
   }
   function update(dt, time) {
     if (phase !== "playing") return;
+    if (!mapOverlay.classList.contains("hidden") || !aboutOverlay.classList.contains("hidden")) return;
+    updatePeople(dt);
     const down = name => keys.has(name) || touch.has(name);
     let dx = Number(down("right")) - Number(down("left"));
     let dy = Number(down("down")) - Number(down("up"));
@@ -369,12 +451,12 @@
     if (message && time > messageUntil) message = "";
   }
   function locationName() {
-    if (player.y > 1230) return "HOME";
-    if (player.x > 510 && player.y > 640) return "KHEN ST";
-    if (player.y > 535 && player.y < 650) return "TSAHAL ST";
-    if (player.x < 395 && player.y < 570) return "HA-TSO'ARIM ST";
-    if (player.y < 540 && player.x > 395 && player.x < 620) return "KAPLAN SCHOOL";
-    return "KAPLAN ST";
+    if (distance(player.x, player.y, school.x, school.y) < 100) return "KAPLAN SCHOOL";
+    const nearest = markers.reduce((best, marker) => {
+      const d = distance(player.x, player.y, marker.x, marker.y);
+      return d < best.distance ? { name: marker.name, distance: d } : best;
+    }, { name: "PETAH TIKVA", distance: Infinity });
+    return nearest.distance < 185 ? nearest.name.toUpperCase() : "PETAH TIKVA";
   }
   function panel(x, y, width, height) {
     ctx.fillStyle = "#25364b";
@@ -398,6 +480,58 @@
     ctx.fillStyle = "#fffce6";
     ctx.fillRect(sx - 2, sy - 6, 4, 4);
   }
+  function drawPerson(person) {
+    const x = Math.round(person.x - camera.x);
+    const y = Math.round(person.y - camera.y);
+    if (x < -25 || y < -45 || x > W + 25 || y > H + 25) return;
+    const stride = Math.floor(person.stride) % 2;
+    ctx.fillStyle = "#30444988";
+    ctx.fillRect(x - 8, y + 1, 16, 4);
+    ctx.fillStyle = "#26323d";
+    ctx.fillRect(x - 8, y - 28, 16, 28);
+    ctx.fillStyle = person.pants;
+    ctx.fillRect(x - 6, y - 11, 5, 11 + stride);
+    ctx.fillRect(x + 1, y - 11, 5, 12 - stride);
+    ctx.fillStyle = person.shirt;
+    ctx.fillRect(x - 8, y - 20, 16, 11);
+    ctx.fillStyle = person.skin;
+    ctx.fillRect(x - 6, y - 30, 12, 11);
+    ctx.fillRect(x - 10, y - 19, 3, 7);
+    ctx.fillRect(x + 7, y - 19, 3, 7);
+    ctx.fillStyle = person.hair;
+    ctx.fillRect(x - 7, y - 32, 14, 5);
+    ctx.fillRect(x - 7, y - 28, 2, 5);
+    ctx.fillStyle = "#25313b";
+    ctx.fillRect(x - 3, y - 25, 2, 2);
+    ctx.fillRect(x + 2, y - 25, 2, 2);
+    if (person.accessory) {
+      ctx.fillStyle = person.accessory;
+      ctx.fillRect(x + 6, y - 19, 4, 10);
+    }
+  }
+  function drawOverview() {
+    if (!map.complete || !map.naturalWidth) return;
+    overviewCtx.imageSmoothingEnabled = false;
+    overviewCtx.drawImage(map, 0, 0, overview.width, overview.height);
+    const point = (x, y, color, radius) => {
+      const px = x / WORLD_W * overview.width;
+      const py = y / WORLD_H * overview.height;
+      overviewCtx.fillStyle = "#203444";
+      overviewCtx.fillRect(px - radius - 2, py - radius - 2, radius * 2 + 4, radius * 2 + 4);
+      overviewCtx.fillStyle = color;
+      overviewCtx.fillRect(px - radius, py - radius, radius * 2, radius * 2);
+    };
+    point(school.x, school.y, "#dd5752", 5);
+    for (const marker of markers) if (!marker.found) point(marker.x, marker.y, "#ffde5b", 4);
+    point(player.x, player.y, "#4c91e3", 5);
+  }
+  function openMap() {
+    if (phase === "battle") return;
+    keys.clear(); touch.clear();
+    drawOverview();
+    mapOverlay.classList.remove("hidden");
+  }
+  function closeMap() { mapOverlay.classList.add("hidden"); }
   function drawPlayer() {
     const x = Math.round(player.x - camera.x);
     const y = Math.round(player.y - camera.y);
@@ -462,6 +596,7 @@
       ctx.fillStyle = p.life > 0.35 ? "#fffbb6" : "#f8b94d";
       ctx.fillRect(Math.round(p.x - camera.x), Math.round(p.y - camera.y), 5, 5);
     }
+    for (const person of people) drawPerson(person);
     drawPlayer();
     panel(12, 12, 211, 39);
     ctx.fillStyle = "#25364b";
@@ -475,7 +610,7 @@
       ctx.fillStyle = "#25364b";
       ctx.font = "bold 17px Consolas, monospace";
       ctx.fillText(message, 32, 441);
-    } else if (phase === "playing" && distance(player.x, player.y, school.x, school.y) < 57) {
+    } else if (phase === "playing" && distance(player.x, player.y, school.x, school.y) < 70) {
       panel(16, 405, 608, 61);
       ctx.fillStyle = "#25364b";
       ctx.font = "bold 17px Consolas, monospace";
@@ -483,6 +618,7 @@
     }
   }
   function tick(timestamp) {
+    if (startButton.disabled && map.naturalWidth) assetsReady();
     const seconds = timestamp / 1000;
     const dt = Math.min(0.05, lastTime ? seconds - lastTime : 0);
     lastTime = seconds;
@@ -496,8 +632,11 @@
     KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right",
   };
   window.addEventListener("keydown", event => {
+    if (event.code === "Escape" && !mapOverlay.classList.contains("hidden")) {
+      closeMap(); return;
+    }
     const direction = keyMap[event.code];
-    if (direction) {
+    if (direction && mapOverlay.classList.contains("hidden") && aboutOverlay.classList.contains("hidden")) {
       event.preventDefault();
       keys.add(direction);
     } else if (["KeyE", "Enter", "Space", "KeyZ"].includes(event.code)) {
@@ -540,13 +679,14 @@
   document.getElementById("attackButton").addEventListener("click", attack);
   document.getElementById("healButton").addEventListener("click", snack);
   document.getElementById("aboutButton").addEventListener("click", () => {
-    aboutWasOpen = phase === "playing";
-    if (aboutWasOpen) { keys.clear(); touch.clear(); save(); }
+    if (phase === "playing") { keys.clear(); touch.clear(); save(); }
     aboutOverlay.classList.remove("hidden");
   });
   document.getElementById("closeAboutButton").addEventListener("click", () => {
     aboutOverlay.classList.add("hidden");
   });
+  document.getElementById("mapButton").addEventListener("click", openMap);
+  document.getElementById("closeMapButton").addEventListener("click", closeMap);
   soundButton.addEventListener("click", () => {
     audio = !audio;
     soundButton.textContent = `♪ ${audio ? "On" : "Off"}`;
@@ -571,21 +711,46 @@
   updateStatus();
   window.kaplanAction = interact;
   window.kaplanBack = () => {
-    if (!aboutOverlay.classList.contains("hidden")) aboutOverlay.classList.add("hidden");
+    if (!mapOverlay.classList.contains("hidden")) closeMap();
+    else if (!aboutOverlay.classList.contains("hidden")) aboutOverlay.classList.add("hidden");
     else if (phase === "battle") attack();
     else if (phase === "playing") { save(); say("Progress saved.", 2); }
   };
   map.addEventListener("error", () => {
     document.querySelector(".overlay-card p").textContent =
-      "Map artwork could not load. Keep index.html and gba_town_map.png in the same folder.";
+      "Town artwork could not load. Check petah_tikva_town_map.png.";
   });
+  function assetsReady() {
+    const ready = !!(walkBits.length && map.naturalWidth);
+    startButton.disabled = !ready;
+    continueButton.disabled = !ready;
+    if (ready) drawOverview();
+  }
+  map.addEventListener("load", assetsReady);
+  assetsReady();
   if (new URLSearchParams(location.search).has("test")) {
     window.__siteSDebug = () => ({
       x: Math.round(player.x), y: Math.round(player.y),
       markers: foundCount(), phase,
       hp: buddy.hp, enemyHp: battle?.hp ?? null,
       avatarLoaded: playerArt.complete && playerArt.naturalWidth > 0,
+      mapLoaded: map.complete && map.naturalWidth > 0,
+      maskLoaded: !!walkBits.length, peopleCount: people.length, peopleSeed,
+      mapOpen: !mapOverlay.classList.contains("hidden"),
+      message,
     });
+    window.__siteSTest = {
+      setPlayer(x, y) {
+        if (!canStand(x, y)) return false;
+        player.x = x; player.y = y;
+        camera.x = clamp(x - W / 2, 0, WORLD_W - W);
+        camera.y = clamp(y - H / 2, 0, WORLD_H - H);
+        return true;
+      },
+      nearestPeople: () => people.filter(person => distance(person.x, person.y, player.x, player.y) < 320).length,
+      firstPerson: () => people.length ? { x: people[0].x, y: people[0].y,
+        name: people[0].name } : null,
+    };
   }
   requestAnimationFrame(tick);
 })();

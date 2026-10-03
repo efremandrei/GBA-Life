@@ -26,7 +26,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; background: #102038ab; backdrop-filter: blur(2px); }
 .overlay.hidden { display: none; }
 .hidden { display: none !important; }
-.overlay-card { width: min(100%, 470px); padding: 24px 26px; text-align: center; color: #25364b; background: #fff8dc; border: 5px solid #2a455e; border-radius: 6px; box-shadow: 6px 6px 0 #14283a; }
+.overlay-card { width: min(100%, 470px); max-height: 100%; overflow-y: auto; padding: 24px 26px; text-align: center; color: #25364b; background: #fff8dc; border: 5px solid #2a455e; border-radius: 6px; box-shadow: 6px 6px 0 #14283a; }
 .tag { display: inline-block; padding: 5px 9px; border-radius: 3px; color: #fff9ea; background: #3b806e; font-size: 12px; font-weight: bold; letter-spacing: .1em; }
 .overlay-card h2 { margin: 15px 0 8px; color: #233f5a; font-size: clamp(23px, 5vw, 34px); line-height: 1.08; }
 .overlay-card p { font-size: 14px; line-height: 1.5; }
@@ -36,6 +36,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 .secondary-button { display: inline-block; margin-top: 10px; padding: 12px 18px; border: 3px solid #437968; border-radius: 5px; background: #6d9e7b; box-shadow: 3px 3px 0 #315444; color: #fff; font-weight: bold; }
 .secondary-button:active, .primary-button:active { transform: translateY(3px); box-shadow: none; }
 .battle-card { max-width: 460px; }
+.about-card { max-height: 100%; overflow-y: auto; }
 .battle-card h2 { margin: 8px 0 3px; font-size: clamp(18px, 4vw, 27px); }
 .battle-card canvas { width: 180px; height: 82px; margin: 3px auto; image-rendering: pixelated; }
 .battle-stats { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: bold; }
@@ -43,6 +44,15 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 .battle-card p { margin: 5px 0; min-height: 30px; }
 .quest-strip { max-width: 670px; margin: 10px auto 0; display: flex; justify-content: space-between; gap: 10px; color: #dcf1d6; font-size: 12px; }
 .bottom-actions { max-width: 670px; margin: 8px auto 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #aac1bc; font-size: 11px; }
+.bottom-buttons { display: flex; gap: 8px; }
+.map-overlay { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 16px; background: #0b1c2dde; }
+.map-card { width: min(100%, 760px); max-height: 92dvh; overflow: auto; padding: 16px; border: 4px solid #587e84; border-radius: 12px; background: #f7f2d9; color: #263d4d; box-shadow: 8px 8px 0 #091723; }
+.map-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.map-heading h2 { margin: 3px 0 12px; font-size: 26px; }
+.map-heading .eyebrow { color: #39745f; }
+.map-card canvas { width: 100%; height: auto; border: 4px solid #263d4d; image-rendering: pixelated; }
+.map-card p { margin: 8px 0 0; font-size: 12px; }
+.map-card .map-credit { color: #65746e; font-size: 10px; }
 .overlay-hint { margin-bottom: 0; color: #687481; font-size: 11px !important; }
 .console-bottom { display: flex; justify-content: space-between; align-items: center; padding: 12px 7px 0; }
 .speaker { display: flex; gap: 5px; transform: skewX(-20deg); }
