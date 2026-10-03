@@ -302,7 +302,7 @@
     say("Collect 3 gold markers, then enter Kaplan School.", 5);
     canvas.focus();
   }
-  function isHouseType(type) { return ["house", "house_blue", "house_teal"].includes(type); }
+  function isHouseType(type) { return ["house", "house_blue", "house_teal", "high_building"].includes(type); }
   function houseName(id) { return typeof id === "number" ? `House ${id + 1}` : `Custom house ${String(id).replace("edit-", "")}`; }
   function enterHouse(house) {
     const room = HouseRooms.layout(W, H);
@@ -362,7 +362,7 @@
       consider("house", house.entry[0], house.entry[1], { ...house, id }, 58);
     const cols = WORLD_W / MapGrid.tileSize;
     for (const [index, type] of mapEdits) {
-      if (["grass", "road", "path", "plaza"].includes(type)) continue;
+      if (["grass", "road", "path", "plaza", "sidewalk", "crossing"].includes(type)) continue;
       const x = (index % cols + .5) * MapGrid.tileSize;
       const y = (Math.floor(index / cols) + .5) * MapGrid.tileSize;
       if (isHouseType(type)) consider("house", x, y, { id: `edit-${index}`, roof: type }, 57);
@@ -387,6 +387,19 @@
     else if (kind === "fence") say("A white picket fence marks the garden edge.", 4);
     else if (kind === "water") say("The water shimmers. Better stay on the path.", 4);
     else if (kind === "school") say("A school building stands beside the road.", 4);
+    else if (kind === "bus_stop") say("A bus stop. Check the posted route before you ride.", 4);
+    else if (kind === "tram_stop") say("The light rail platform connects neighborhoods across the city.", 4);
+    else if (kind === "car") say("A parked car. Watch for traffic before crossing.", 4);
+    else if (kind === "bike") say("A bicycle is ready for a ride along the street.", 4);
+    else if (kind === "tram") say("The blue and white light rail waits at the platform.", 4);
+    else if (kind === "playground_slide") say("A bright red slide stands in the park.", 4);
+    else if (kind === "playground_swings") say("The swings creak gently in the breeze.", 4);
+    else if (kind === "gas_station") say("Fuel pumps stand beneath the station canopy.", 4);
+    else if (kind === "shopping_mall") say("Shops line the bright indoor promenade.", 4);
+    else if (kind === "hospital") say("The hospital entrance is open to the neighborhood.", 4);
+    else if (kind === "city_hall") say("City Hall serves the people of Petah Tikva.", 4);
+    else if (kind === "traffic_light") say("Wait for the green signal before crossing.", 4);
+    else if (kind === "bench") say("A good place to sit and rest for a moment.", 4);
     else say("You take a closer look at the scenery.", 4);
   }
   function interact() {
@@ -1059,6 +1072,10 @@
       setRoomPlayer(x, y) { if (!inside) return false; inside.x = x; inside.y = y; return true; },
       setBuddy(hp, snacks) { buddy.hp = hp; buddy.snacks = snacks; updateStatus(); },
       nearestInteraction: () => nearestWorldThing().kind,
+      nearestInteractionType: () => {
+        const nearest = nearestWorldThing();
+        return nearest.kind === "scenery" ? nearest.data[2] : nearest.kind;
+      },
     };
   }
   requestAnimationFrame(tick);

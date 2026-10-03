@@ -30,6 +30,7 @@ button:focus-visible, canvas:focus-visible { outline:3px solid #ffe082; outline-
 .section-heading span { color:#a3c5bb; font-size:11px; }
 .palette { position:absolute; inset:37px 0 0; display:flex; flex-direction:column; gap:5px; overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y; padding:7px 5px 10px; scrollbar-color:#81bca6 #17313c; }
 .palette button { flex:none; display:flex; align-items:center; gap:6px; min-height:58px; padding:5px; font-size:11px; text-align:left; line-height:1.1; }
+.palette-group { flex:none; margin:6px 1px 1px; padding:4px 3px; border-bottom:1px solid #648b8b; color:#a8d5c1; font-size:10px; font-weight:bold; letter-spacing:.06em; }
 .palette button.selected { border-color:#ffde7a; background:#375e61; box-shadow:inset 0 0 0 2px #f4d575; }
 .swatch { display:block; flex:none; width:43px; height:43px; border:2px solid #1b3041; image-rendering:pixelated; }
 .actions,.file-buttons { display:flex; gap:7px; flex-wrap:wrap; }

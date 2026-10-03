@@ -30,6 +30,17 @@ const path = require('path');
   if (await page.locator('#gameMenu').isVisible()) throw new Error('Compact menu did not close');
   if (beginning.houseCount < 200 || beginning.sceneryCount < 300)
     throw new Error('House or scenery metadata is missing');
+  const cityCounts = await page.evaluate(() => ({
+    houses: window.TOWN_DATA.houses.filter(h => h.roof === 'high_building').length,
+    kinds: window.TOWN_DATA.scenery.reduce((counts, item) => {
+      counts[item[2]] = (counts[item[2]] || 0) + 1; return counts;
+    }, {}),
+    tileCount: window.MapGrid.types.length,
+  }));
+  if (cityCounts.tileCount !== 32 || cityCounts.houses < 20 ||
+      ['hospital', 'bus_stop', 'tram_stop', 'tram', 'car', 'bike', 'playground_slide',
+        'playground_swings', 'traffic_light', 'bench'].some(kind => !cityCounts.kinds[kind]))
+    throw new Error(`New city assets are missing: ${JSON.stringify(cityCounts)}`);
   const inaccessible = await page.evaluate(() => {
     const failed = [];
     window.TOWN_DATA.houses.forEach((house, index) => {
@@ -40,7 +51,7 @@ const path = require('path');
   if (inaccessible.length) throw new Error(`Houses without walkable entrances: ${inaccessible.slice(0, 12)}`);
   if (!await page.evaluate(() => window.__siteSTest.enterHouse(0))) throw new Error('Could not enter house');
   if ((await page.evaluate(() => window.__siteSDebug())).interior !== 0) throw new Error('House interior did not open');
-  await page.screenshot({ path: path.join(__dirname, 'docs/preview_house_v5.png') });
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_house_v6.png') });
   const roomObjects = await page.evaluate(() => window.__siteSTest.roomObjects());
   const bed = roomObjects.find(item => item.kind === 'bed');
   const chest = roomObjects.find(item => item.kind === 'chest');
@@ -75,6 +86,24 @@ const path = require('path');
   const sceneryMessage = (await page.evaluate(() => window.__siteSDebug())).message;
   if (!sceneryMessage || sceneryMessage.includes('Follow the markers'))
     throw new Error(`Scenery did not respond: ${sceneryMessage}`);
+  for (const kind of ['hospital', 'bus_stop', 'tram_stop', 'tram', 'car', 'bike',
+    'playground_slide', 'playground_swings']) {
+    const reachable = await page.evaluate(kind => {
+      for (const item of window.TOWN_DATA.scenery.filter(item => item[2] === kind)) {
+        for (const radius of [0, 8, 16, 24, 32, 40]) {
+          for (const [dx, dy] of [[radius, 0], [-radius, 0], [0, radius], [0, -radius]]) {
+            if (window.__siteSTest.setPlayer(item[0] + dx, item[1] + dy) &&
+                window.__siteSTest.nearestInteractionType() === kind) return true;
+          }
+        }
+      }
+      return false;
+    }, kind);
+    if (!reachable) throw new Error(`Cannot reach or interact with a ${kind}`);
+    await page.keyboard.press('e');
+    if (!(await page.evaluate(() => window.__siteSDebug().message)))
+      throw new Error(`${kind} gave no interaction message`);
+  }
   const editedHouse = await page.evaluate(() => {
     const width = 4096, height = 2304, tile = 32, cols = width / tile;
     const [startX, startY] = window.TOWN_DATA.start;
@@ -85,7 +114,7 @@ const path = require('path');
         for (const [dx, dy] of [[32, 0], [-32, 0], [0, 32], [0, -32]]) {
           if (!window.__siteSTest.isWalkable(x + dx, y + dy)) continue;
           const index = row * cols + col;
-          const json = window.MapGrid.serialize(new Map([[index, 'house_blue']]), width, height);
+          const json = window.MapGrid.serialize(new Map([[index, 'high_building']]), width, height);
           if (!window.kaplanApplyMap(json)) continue;
           if (window.__siteSTest.setPlayer(x + dx, y + dy) &&
               window.__siteSTest.nearestInteraction() === 'house') return index;
@@ -112,10 +141,10 @@ const path = require('path');
   if (!(await page.evaluate(() => window.__siteSDebug().message)).startsWith(`${personAfter.name}:`))
     throw new Error('Townsperson did not talk');
   await page.evaluate(([x, y]) => window.__siteSTest.setPlayer(x, y), [beginning.x, beginning.y]);
-  await page.screenshot({ path: path.join(__dirname, 'docs/preview_start_v5.png') });
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_start_v6.png') });
   await page.locator('#mapButton').click();
   if (!await page.locator('#mapOverlay').isVisible()) throw new Error('Town map did not open');
-  await page.screenshot({ path: path.join(__dirname, 'docs/preview_map_v5.png') });
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_map_v6.png') });
   await page.keyboard.press('Escape');
   if (await page.locator('#mapOverlay').isVisible()) throw new Error('Town map did not close');
 
@@ -145,7 +174,7 @@ const path = require('path');
     if (state.markers !== i + 1) throw new Error(`Marker ${i} did not collect`);
     if (state.phase === 'battle') {
       battles++;
-        await page.screenshot({ path: path.join(__dirname, `docs/preview_battle_${battles}_v5.png`) });
+        await page.screenshot({ path: path.join(__dirname, `docs/preview_battle_${battles}_v6.png`) });
       for (let turn = 0; turn < 10; turn++) {
         if ((await page.evaluate(() => window.__siteSDebug())).phase !== 'battle') break;
         await page.locator('#attackButton').click();
@@ -164,7 +193,7 @@ const path = require('path');
   await page.keyboard.press('e');
   await page.waitForTimeout(200);
   const won = await page.locator('#winOverlay').isVisible();
-  await page.screenshot({ path: path.join(__dirname, 'docs/preview_win_v5.png') });
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_win_v6.png') });
   const mobileWidth = await page.evaluate(() => ({ viewport: innerWidth, content: document.documentElement.scrollWidth }));
   await page.locator('#playAgainButton').click();
   const newSeed = await page.evaluate(() => window.__siteSDebug().peopleSeed);

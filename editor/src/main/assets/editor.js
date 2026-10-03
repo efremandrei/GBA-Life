@@ -185,7 +185,17 @@
     canvas.style.cursor = next === "hand" ? "grab" : "crosshair";
     message(next === "hand" ? "Drag the map to move around." : `${next} selected · tap or drag to paint`);
   }
+  const paletteGroups = new Map([
+    ["grass", "STREETS"], ["tree", "NATURE"], ["house", "BUILDINGS"],
+    ["bus_stop", "TRANSIT"], ["playground_slide", "PARK & DETAILS"],
+  ]);
   for (const name of ["hand", ...MapGrid.types, "erase"]) {
+    if (paletteGroups.has(name)) {
+      const heading = document.createElement("div");
+      heading.className = "palette-group";
+      heading.textContent = paletteGroups.get(name);
+      palette.append(heading);
+    }
     const button = document.createElement("button");
     button.type = "button"; button.dataset.tool = name;
     const swatch = document.createElement("canvas");
@@ -199,8 +209,10 @@
       swatchCtx.font = "bold 25px sans-serif";
       swatchCtx.fillText(name === "hand" ? "✥" : "×", 7, 25);
     }
-    const labels = { house: "Red house", house_blue: "Blue house", house_teal: "Teal house" };
-    button.append(swatch, document.createTextNode(labels[name] || name[0].toUpperCase() + name.slice(1)));
+    const labels = { house: "Red house", house_blue: "Blue house", house_teal: "Teal house",
+      bike: "Bicycle", tram: "Light rail tram" };
+    button.append(swatch, document.createTextNode(labels[name] ||
+      name.replace(/_/g, " ").replace(/^./, letter => letter.toUpperCase())));
     button.addEventListener("click", () => setTool(name));
     palette.append(button);
   }

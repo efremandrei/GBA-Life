@@ -116,7 +116,8 @@ def main() -> None:
         shape = points(road)
         width = ROAD_WIDTH[kind]
         draw.line(shape, fill="#718778", width=width + 5, joint="curve")
-        md.line(shape, fill=255, width=width + 5, joint="curve")
+        walking_width = width + (8 if kind not in ("footway", "path", "pedestrian", "steps") else 5)
+        md.line(shape, fill=255, width=walking_width, joint="curve")
         for x, y in (shape[0], shape[-1]):
             md.ellipse((x - width // 2 - 2, y - width // 2 - 2,
                         x + width // 2 + 2, y + width // 2 + 2), fill=255)
@@ -132,19 +133,45 @@ def main() -> None:
         draw.line(shape, fill=color, width=ROAD_WIDTH[kind], joint="curve")
 
     # Pattern the OSM street paths with the reference-inspired stone art.
+    sidewalk_surface = Image.new("L", (BASE_W, BASE_H), 0)
     road_surface = Image.new("L", (BASE_W, BASE_H), 0)
     path_surface = Image.new("L", (BASE_W, BASE_H), 0)
-    rd, pd = ImageDraw.Draw(road_surface), ImageDraw.Draw(path_surface)
+    sd, rd, pd = ImageDraw.Draw(sidewalk_surface), ImageDraw.Draw(road_surface), ImageDraw.Draw(path_surface)
     for road in roads:
         kind = road["tags"]["highway"]
         surface_draw = pd if kind in ("footway", "path", "pedestrian", "steps") else rd
         surface_draw.line(points(road), fill=255, width=ROAD_WIDTH[kind], joint="curve")
+        if surface_draw is rd:
+            sd.line(points(road), fill=255, width=ROAD_WIDTH[kind] + 12, joint="curve")
+    sidewalk_pattern = tile_surface(sprite("sidewalk", 48, 48).crop((9, 9, 39, 39)),
+                                   BASE_W, BASE_H)
     road_pattern = tile_surface(sprite("road", 64, 64).crop((22, 20, 44, 42)),
                                 BASE_W, BASE_H)
     path_pattern = tile_surface(sprite("path", 48, 48).crop((12, 12, 36, 36)),
                                 BASE_W, BASE_H)
+    art.paste(sidewalk_pattern, (0, 0), sidewalk_surface)
     art.paste(road_pattern, (0, 0), road_surface)
     art.paste(path_pattern, (0, 0), path_surface)
+
+    # Crossings sit on selected vehicle streets; the road geometry itself is
+    # still sourced from OSM and remains fully walkable.
+    crossing_count = 0
+    vehicle_roads = [road for road in roads if road["tags"]["highway"] in
+                     ("primary", "secondary", "tertiary", "residential")]
+    for road in vehicle_roads[::31]:
+        shape = points(road)
+        if len(shape) < 2:
+            continue
+        middle = len(shape) // 2
+        x, y = shape[middle]
+        if not (18 <= x < BASE_W - 18 and 18 <= y < BASE_H - 18):
+            continue
+        a, b = shape[middle - 1], shape[middle]
+        crossing = sprite("crossing", 18, 18)
+        if abs(b[0] - a[0]) > abs(b[1] - a[1]):
+            crossing = crossing.rotate(90, expand=False, resample=Image.Resampling.NEAREST)
+        art.paste(crossing, (x - 9, y - 9), crossing)
+        crossing_count += 1
 
     occupied = Image.new("L", (BASE_W, BASE_H), 0)
     od = ImageDraw.Draw(occupied)
@@ -173,8 +200,74 @@ def main() -> None:
                         return cx, cy
         return None
 
+    def place_connected(kind: str, cx: int, cy: int, width: int, height: int) -> bool:
+        """Place a building or park object beside a connected walkable path."""
+        box = (cx - width // 2 - 2, cy - height // 2 - 2,
+               cx + width // 2 + 3, cy + height // 2 + 3)
+        if (box[0] < 8 or box[1] < 8 or box[2] >= BASE_W - 8 or box[3] >= BASE_H - 8 or
+                occupied.crop(box).getbbox() or mask.crop(box).getbbox() or
+                zone.getpixel((cx, cy)) == 3):
+            return False
+        door_x, door_y = cx, cy + height // 2 + 4
+        connected = road_connection(door_x, door_y)
+        if connected is None:
+            return False
+        draw.line(((door_x, door_y), connected), fill="#e0d5b7", width=5)
+        md.line(((door_x, door_y), connected), fill=255, width=11)
+        md.ellipse((door_x - 5, door_y - 5, door_x + 5, door_y + 5), fill=255)
+        image = sprite(kind, width, height)
+        art.paste(image, (cx - width // 2, cy - height // 2), image)
+        od.rectangle(box, fill=255)
+        scenery.append([door_x * SCALE, door_y * SCALE, kind])
+        return True
+
+    # The hospital polygons are the three hospitals in the downloaded OSM
+    # snapshot. Other civic/commercial sprites stay in the editor palette
+    # until a matching mapped site is available.
+    hospitals = 0
+    for place in places:
+        if place.get("tags", {}).get("amenity") != "hospital":
+            continue
+        shape = points(place)
+        cx = sum(x for x, _ in shape) // len(shape)
+        cy = sum(y for _, y in shape) // len(shape)
+        for dx, dy in ((0, 0), (-24, 0), (24, 0), (0, -24), (0, 24)):
+            if place_connected("hospital", cx + dx, cy + dy, 36, 34):
+                hospitals += 1
+                break
+
+    transit_stops = 0
+    tram_platforms = []
+    for platform in roads_raw["elements"]:
+        tags = platform.get("tags", {})
+        if tags.get("public_transport") != "platform" or not platform.get("geometry"):
+            continue
+        shape = points(platform)
+        cx = sum(x for x, _ in shape) // len(shape)
+        cy = sum(y for _, y in shape) // len(shape)
+        if not (14 <= cx < BASE_W - 14 and 14 <= cy < BASE_H - 14):
+            continue
+        kind = "tram_stop" if tags.get("light_rail") == "yes" else "bus_stop"
+        width, height = (23, 18) if kind == "tram_stop" else (19, 17)
+        box = (cx - width // 2 - 2, cy - height // 2 - 2,
+               cx + width // 2 + 3, cy + height // 2 + 3)
+        if occupied.crop(box).getbbox():
+            continue
+        if not mask.getpixel((cx, cy)):
+            connected = road_connection(cx, cy)
+            if connected:
+                draw.line(((cx, cy), connected), fill="#e0d5b7", width=4)
+                md.line(((cx, cy), connected), fill=255, width=7)
+        image = sprite(kind, width, height)
+        art.paste(image, (cx - width // 2, cy - height // 2), image)
+        od.rectangle(box, fill=255)
+        scenery.append([cx * SCALE, cy * SCALE, kind])
+        if kind == "tram_stop":
+            tram_platforms.append((cx, cy))
+        transit_stops += 1
+
     made = 0
-    for _ in range(30000):
+    for _ in range(100000):
         if made >= 950:
             break
         x, y = RNG.randrange(18, BASE_W - 35), RNG.randrange(18, BASE_H - 35)
@@ -192,12 +285,75 @@ def main() -> None:
         md.line(((door_x, door_y), connected), fill=255, width=11)
         md.ellipse((door_x - 5, door_y - 5, door_x + 5, door_y + 5), fill=255)
         roof = RNG.choice(roofs)
+        if made % 12 == 0:
+            roof = "high_building"
         house = sprite(roof, w + 8, h + 8)
         art.paste(house, (x - 4, y - 4), house)
         od.rectangle(box, fill=255)
         houses.append({"entry": [door_x * SCALE, door_y * SCALE],
                        "door": [door_x * SCALE, door_y * SCALE], "roof": roof})
         made += 1
+
+    playgrounds = 0
+    for _ in range(12000):
+        if playgrounds >= 12:
+            break
+        cx, cy = RNG.randrange(22, BASE_W - 22), RNG.randrange(22, BASE_H - 22)
+        if zone.getpixel((cx, cy)) != 1:
+            continue
+        kind = "playground_slide" if playgrounds % 2 == 0 else "playground_swings"
+        if place_connected(kind, cx, cy, 20, 18):
+            playgrounds += 1
+
+    benches = 0
+    for _ in range(6000):
+        if benches >= 10:
+            break
+        cx, cy = RNG.randrange(18, BASE_W - 18), RNG.randrange(18, BASE_H - 18)
+        if zone.getpixel((cx, cy)) == 1 and place_connected("bench", cx, cy, 15, 10):
+            benches += 1
+
+    roadside_props = 0
+    for road in vehicle_roads[::28]:
+        shape = points(road)
+        if len(shape) < 2:
+            continue
+        middle = len(shape) // 2
+        a, b = shape[middle - 1], shape[middle]
+        length = max(1, math.dist(a, b))
+        side = -1 if roadside_props % 2 else 1
+        offset = ROAD_WIDTH[road["tags"]["highway"]] // 2 + 12
+        cx = round(b[0] + side * (a[1] - b[1]) / length * offset)
+        cy = round(b[1] + side * (b[0] - a[0]) / length * offset)
+        if not (15 <= cx < BASE_W - 15 and 15 <= cy < BASE_H - 15):
+            continue
+        kind = ("car" if roadside_props % 4 < 2 else
+                "bike" if roadside_props % 4 == 2 else "traffic_light")
+        width, height = {"car": (12, 18), "bike": (16, 12), "traffic_light": (9, 17)}[kind]
+        box = (cx - width // 2 - 2, cy - height // 2 - 2,
+               cx + width // 2 + 3, cy + height // 2 + 3)
+        if occupied.crop(box).getbbox() or zone.getpixel((cx, cy)) == 3:
+            continue
+        image = sprite(kind, width, height)
+        art.paste(image, (cx - width // 2, cy - height // 2), image)
+        od.rectangle(box, fill=255)
+        scenery.append([cx * SCALE, cy * SCALE, kind])
+        roadside_props += 1
+
+    tram_cars = 0
+    for cx, cy in tram_platforms[::2]:
+        for dx, dy in ((24, 0), (-24, 0), (0, 27), (0, -27)):
+            x, y = cx + dx, cy + dy
+            box = (x - 8, y - 15, x + 8, y + 15)
+            if (box[0] < 0 or box[1] < 0 or box[2] >= BASE_W or box[3] >= BASE_H or
+                    occupied.crop(box).getbbox() or zone.getpixel((x, y)) == 3):
+                continue
+            image = sprite("tram", 15, 27)
+            art.paste(image, (x - 7, y - 13), image)
+            od.rectangle(box, fill=255)
+            scenery.append([x * SCALE, y * SCALE, "tram"])
+            tram_cars += 1
+            break
 
     trees = 0
     for _ in range(30000):
@@ -349,7 +505,9 @@ def main() -> None:
                 "start": town["start"], "school": town["school"],
                 "markers": [marker["point"] for marker in town["markers"]],
             }, separators=(",", ":")) + ";\n", encoding="utf-8")
-    print(f"Map {WORLD_W}x{WORLD_H}: {len(roads)} roads, {made} enterable houses, "
+    print(f"Map {WORLD_W}x{WORLD_H}: {len(roads)} roads, {crossing_count} crossings, "
+          f"{made} enterable houses, {hospitals} hospitals, {transit_stops} transit stops, "
+          f"{tram_cars} trams, {playgrounds} playgrounds, {roadside_props} roadside props, "
           f"{trees} trees, {len(scenery)} scenery interactions, {len(npc_paths)} NPC paths. "
           f"School at {town['school']}.")
 

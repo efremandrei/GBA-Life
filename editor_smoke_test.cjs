@@ -20,14 +20,14 @@ const fs = require('fs');
     return { beside: rail.left >= map.right, scrollable: palette.scrollHeight > palette.clientHeight,
       count: palette.querySelectorAll('button').length };
   });
-  if (!paletteLayout.beside || !paletteLayout.scrollable || paletteLayout.count < 16)
+  if (!paletteLayout.beside || !paletteLayout.scrollable || paletteLayout.count < 32)
     throw new Error(`Tile sidebar is not beside the map and scrollable: ${JSON.stringify(paletteLayout)}`);
   await page.screenshot({ path: path.join(__dirname, 'docs/editor_preview.png'), fullPage: true });
   await page.locator('#paletteDown').click();
   await page.waitForFunction(() => document.querySelector('#palette').scrollTop > 0);
   await page.locator('#paletteUp').click();
-  await page.locator('[data-tool="fountain"]').click();
-  if ((await page.evaluate(() => window.__editorDebug())).tool !== 'fountain')
+  await page.locator('[data-tool="city_hall"]').click();
+  if ((await page.evaluate(() => window.__editorDebug())).tool !== 'city_hall')
     throw new Error('Scrolled tile choice could not be selected');
   await page.screenshot({ path: path.join(__dirname, 'docs/editor_sidebar_scrolled.png'), fullPage: true });
   const rect = await page.locator('#mapCanvas').boundingBox();
@@ -78,6 +78,11 @@ const fs = require('fs');
   await game.locator('#startButton').click();
   await game.evaluate(() => window.__siteSTest.setPlayer(1539, 995));
   await game.screenshot({ path: path.join(__dirname, 'docs/game_edited_preview.png') });
+  const crossingMap = JSON.stringify({ ...data,
+    tiles: data.tiles.map(([index]) => [index, 'crossing']) });
+  if (!await game.evaluate(json => window.kaplanApplyMap(json), crossingMap) ||
+      !await game.evaluate(() => window.__siteSTest.isWalkable(1584, 1072)))
+    throw new Error('New crossing tiles did not become walkable in the game');
   await game.locator('#menuButton').click();
   await game.locator('#originalMapButton').click();
   if ((await game.evaluate(() => window.__siteSDebug())).mapEdits !== 0) throw new Error('Original map restore failed');

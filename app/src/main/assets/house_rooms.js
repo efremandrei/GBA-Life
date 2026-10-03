@@ -55,7 +55,8 @@
     const room = layout(width, height);
     const items = objects(house, room);
     const variant = seed(house.id);
-    const walls = house.roof === "house_blue" ? ["#a9c6db", "#6e9bb8"] :
+    const walls = house.roof === "high_building" ? ["#c7d8df", "#829ca9"] :
+      house.roof === "house_blue" ? ["#a9c6db", "#6e9bb8"] :
       house.roof === "house_teal" ? ["#b4d6bd", "#75aa96"] : ["#e8c6ae", "#bc8f7c"];
     const rect = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
     ctx.imageSmoothingEnabled = false;

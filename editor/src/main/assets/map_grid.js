@@ -2,15 +2,24 @@
   "use strict";
   const tileSize = 32;
   const artSize = 96;
-  const types = ["grass", "road", "path", "plaza", "water", "tree", "shrub",
-    "flowers", "fence", "house", "house_blue", "house_teal", "lamp", "school",
-    "market", "fountain"];
-  const artIndex = Object.fromEntries([
+  const atlasNames = [
     "grass", "road", "path", "water", "tree", "shrub", "flowers", "fence",
     "house", "house_blue", "house_teal", "lamp", "school", "market", "plaza",
-    "fountain"
-  ].map((name, index) => [name, index]));
-  const walkable = new Set(["road", "path", "plaza"]);
+    "fountain", "sidewalk", "crossing", "high_building", "bus_stop",
+    "tram_stop", "car", "bike", "tram", "playground_slide", "playground_swings",
+    "gas_station", "shopping_mall", "hospital", "city_hall", "traffic_light", "bench",
+  ];
+  const types = [
+    "grass", "road", "path", "plaza", "sidewalk", "crossing", "water",
+    "tree", "shrub", "flowers", "fence",
+    "house", "house_blue", "house_teal", "high_building", "school", "market",
+    "shopping_mall", "hospital", "city_hall", "gas_station",
+    "bus_stop", "tram_stop", "car", "bike", "tram", "traffic_light",
+    "playground_slide", "playground_swings", "bench", "lamp", "fountain",
+  ];
+  const artIndex = Object.fromEntries(atlasNames.map((name, index) => [name, index]));
+  const walkable = new Set(["road", "path", "plaza", "sidewalk", "crossing"]);
+  const terrain = new Set(["grass", "road", "path", "water", "plaza", "sidewalk", "crossing"]);
   const art = new Image();
   art.src = "tile_atlas.png";
 
@@ -42,13 +51,13 @@
     const index = artIndex[type];
     if (index === undefined) return;
     if (!art.complete || !art.naturalWidth) {
-      ctx.fillStyle = type === "water" ? "#278ece" : type === "road" ? "#b7bec0" :
-        type === "path" || type === "plaza" ? "#d5c8ae" : "#91dc78";
+      ctx.fillStyle = type === "water" ? "#278ece" : type === "road" || type === "crossing" ? "#b7bec0" :
+        type === "path" || type === "plaza" || type === "sidewalk" ? "#d5c8ae" : "#91dc78";
       ctx.fillRect(x, y, size, size);
       return;
     }
     ctx.imageSmoothingEnabled = false;
-    if (index >= 4 && type !== "plaza")
+    if (!terrain.has(type))
       ctx.drawImage(art, 0, 0, artSize, artSize, x, y, size, size);
     ctx.drawImage(art, (index % 4) * artSize, Math.floor(index / 4) * artSize,
       artSize, artSize, x, y, size, size);
