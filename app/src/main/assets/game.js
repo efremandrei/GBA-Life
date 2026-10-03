@@ -2,6 +2,12 @@
   "use strict";
 
   const canvas = document.getElementById("game");
+  const compactScreen = window.matchMedia("(max-width: 540px)").matches;
+  if (compactScreen) {
+    const bounds = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(bounds.width));
+    canvas.height = Math.max(1, Math.round(bounds.height));
+  }
   const ctx = canvas.getContext("2d", { alpha: false });
   const town = window.TOWN_DATA;
   if (!town) throw new Error("Town geometry is missing.");
@@ -17,8 +23,8 @@
     left: [186, 660, 320, 492],
     right: [763, 660, 320, 492],
   };
-  const W = canvas.width;
-  const H = canvas.height;
+  let W = canvas.width;
+  let H = canvas.height;
   const WORLD_W = town.width;
   const WORLD_H = town.height;
   const SPEED = 165;
@@ -47,7 +53,9 @@
   ];
   const buddy = { hp: 24, maxHp: 24, snacks: 2 };
   const people = [];
+  const openedChests = new Set();
   let peopleSeed = 0;
+  let inside = null;
   let battle = null;
   let saveTimer = 0;
   let phase = "title";
@@ -65,6 +73,9 @@
   const aboutOverlay = document.getElementById("aboutOverlay");
   const battleMessage = document.getElementById("battleMessage");
   const mapOverlay = document.getElementById("mapOverlay");
+  const gameMenu = document.getElementById("gameMenu");
+  const menuButton = document.getElementById("menuButton");
+  const controls = document.querySelector(".controls");
   const startButton = document.getElementById("startButton");
   const continueButton = document.getElementById("continueButton");
   const overview = document.getElementById("overviewMap");
@@ -141,6 +152,9 @@
         hp: buddy.hp, snacks: buddy.snacks, phase,
         battle: battle ? { markerIndex: battle.markerIndex, hp: battle.hp } : null,
         peopleSeed,
+        interior: inside ? { id: inside.id, roof: inside.roof, x: inside.x, y: inside.y,
+          facing: inside.facing, sourceX: inside.sourceX, sourceY: inside.sourceY } : null,
+        openedChests: [...openedChests],
       }));
     } catch (_error) { /* The game remains playable if storage is unavailable. */ }
   }
@@ -176,6 +190,20 @@
     markers.forEach((marker, index) => { marker.found = !!state.markers?.[index]; });
     buddy.hp = clamp(Number(state.hp) || 24, 1, 24);
     buddy.snacks = clamp(Number(state.snacks) || 0, 0, 2);
+    openedChests.clear();
+    if (Array.isArray(state.openedChests))
+      for (const id of state.openedChests) if (typeof id === "string" || Number.isInteger(id)) openedChests.add(String(id));
+    inside = null;
+    if (state.phase === "playing" && state.interior &&
+        (typeof state.interior.id === "string" || Number.isInteger(state.interior.id))) {
+      const room = HouseRooms.layout(W, H);
+      inside = { id: state.interior.id, roof: state.interior.roof || "house",
+        x: clamp(Number(state.interior.x) || room.exitX, room.x + 18, room.x + room.w - 18),
+        y: clamp(Number(state.interior.y) || room.exitY - 48, room.floorY + 18, room.exitY),
+        facing: playerViews[state.interior.facing] ? state.interior.facing : "up", step: 0,
+        sourceX: Number(state.interior.sourceX) || player.x,
+        sourceY: Number(state.interior.sourceY) || player.y };
+    }
     camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
     camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
     phase = state.phase === "won" ? "won" : "playing";
@@ -248,6 +276,8 @@
   }
   function reset() {
     if (!walkBits.length || !map.naturalWidth) return;
+    inside = null;
+    openedChests.clear();
     player.x = town.start[0];
     player.y = town.start[1];
     player.facing = "down";
@@ -272,6 +302,93 @@
     say("Collect 3 gold markers, then enter Kaplan School.", 5);
     canvas.focus();
   }
+  function isHouseType(type) { return ["house", "house_blue", "house_teal"].includes(type); }
+  function houseName(id) { return typeof id === "number" ? `House ${id + 1}` : `Custom house ${String(id).replace("edit-", "")}`; }
+  function enterHouse(house) {
+    const room = HouseRooms.layout(W, H);
+    inside = { id: house.id, roof: house.roof, x: room.exitX,
+      y: room.exitY - 50, facing: "up", step: 0,
+      sourceX: player.x, sourceY: player.y };
+    keys.clear(); touch.clear();
+    say(`${houseName(house.id)}: explore the room. A examines objects.`, 4);
+    save();
+  }
+  function leaveHouse() {
+    if (!inside) return;
+    player.x = canStand(inside.sourceX, inside.sourceY) ? inside.sourceX : town.start[0];
+    player.y = canStand(inside.sourceX, inside.sourceY) ? inside.sourceY : town.start[1];
+    camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
+    camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
+    inside = null;
+    keys.clear(); touch.clear();
+    say("Back outside in Petah Tikva.", 2.5);
+    save();
+  }
+  function interactInside() {
+    const room = HouseRooms.layout(W, H);
+    const nearby = HouseRooms.nearest(inside.x, inside.y, room, HouseRooms.objects(inside, room));
+    if (nearby.distance > 58) { say("Move closer to a room object and press A."); return; }
+    const kind = nearby.item.kind;
+    if (kind === "exit") { leaveHouse(); return; }
+    if (kind === "bed") {
+      buddy.hp = buddy.maxHp; updateStatus(); save();
+      say("A soft bed. Buddy is fully rested!", 4);
+    } else if (kind === "chest") {
+      const id = String(inside.id);
+      if (openedChests.has(id)) say("The chest is empty now.");
+      else if (buddy.snacks >= 2) say("A snack is inside, but your bag is full.");
+      else {
+        buddy.snacks++; openedChests.add(id); save();
+        say("You found a snack in the chest!", 4);
+      }
+    } else if (kind === "bookshelf") say("The shelf holds stories about Petah Tikva and its streets.", 4);
+    else if (kind === "table") say("A town map is spread across the table. Try the Map button.", 4);
+    else if (kind === "plant") say("A little houseplant is thriving in the sunlight.", 4);
+    else if (kind === "fridge") say("The fridge hums. Someone left a note: 'Enjoy the walk!'", 4);
+    else if (kind === "radio") {
+      audio = !audio;
+      soundButton.textContent = `♪ ${audio ? "On" : "Off"}`;
+      say(`The radio is ${audio ? "playing" : "quiet"}.`, 3);
+      tone(660, .1);
+    }
+  }
+  function nearestWorldThing() {
+    let best = { kind: null, distance: Infinity, data: null };
+    const consider = (kind, x, y, data, limit) => {
+      const d = distance(player.x, player.y, x, y);
+      if (d < limit && d < best.distance) best = { kind, distance: d, data };
+    };
+    for (const [id, house] of (town.houses || []).entries())
+      consider("house", house.entry[0], house.entry[1], { ...house, id }, 58);
+    const cols = WORLD_W / MapGrid.tileSize;
+    for (const [index, type] of mapEdits) {
+      if (["grass", "road", "path", "plaza"].includes(type)) continue;
+      const x = (index % cols + .5) * MapGrid.tileSize;
+      const y = (Math.floor(index / cols) + .5) * MapGrid.tileSize;
+      if (isHouseType(type)) consider("house", x, y, { id: `edit-${index}`, roof: type }, 57);
+      else consider("scenery", x, y, [x, y, type], 52);
+    }
+    for (const person of people) consider("person", person.x, person.y, person, 52);
+    for (const item of town.scenery || [])
+      consider("scenery", item[0], item[1], item, 49);
+    return best;
+  }
+  function interactScenery(item) {
+    const kind = item[2];
+    if (kind === "fountain") {
+      buddy.hp = Math.min(buddy.maxHp, buddy.hp + 5); updateStatus(); save();
+      say("Cool fountain water refreshed Buddy (+5 HP).", 4);
+    } else if (kind === "tree" || kind === "shrub")
+      say("Leaves rustle in the breeze. The shade feels good.", 4);
+    else if (kind === "flowers") say("Colorful flowers brighten the neighborhood.", 4);
+    else if (kind === "lamp") say("A street lamp lights this path after sunset.", 4);
+    else if (kind === "sign") say(`${item[3]} — a familiar Petah Tikva street.`, 4);
+    else if (kind === "market") say("Fresh produce and flowers fill the market stall.", 4);
+    else if (kind === "fence") say("A white picket fence marks the garden edge.", 4);
+    else if (kind === "water") say("The water shimmers. Better stay on the path.", 4);
+    else if (kind === "school") say("A school building stands beside the road.", 4);
+    else say("You take a closer look at the scenery.", 4);
+  }
   function interact() {
     if (!mapOverlay.classList.contains("hidden")) { closeMap(); return; }
     if (!aboutOverlay.classList.contains("hidden")) {
@@ -283,6 +400,7 @@
       reset();
       return;
     }
+    if (inside) { interactInside(); return; }
     if (distance(player.x, player.y, school.x, school.y) < 70) {
       if (foundCount() === markers.length) {
         phase = "won";
@@ -296,14 +414,13 @@
         tone(230, 0.14);
       }
     } else {
-      const nearest = people.reduce((best, person) => {
-        const d = distance(player.x, player.y, person.x, person.y);
-        return d < best.distance ? { person, distance: d } : best;
-      }, { person: null, distance: Infinity });
-      if (nearest.distance < 52) say(`${nearest.person.name}: ${nearest.person.chat}`, 4.5);
+      const nearest = nearestWorldThing();
+      if (nearest.kind === "house") enterHouse(nearest.data);
+      else if (nearest.kind === "person") say(`${nearest.data.name}: ${nearest.data.chat}`, 4.5);
+      else if (nearest.kind === "scenery") interactScenery(nearest.data);
       else if (distance(player.x, player.y, town.start[0], town.start[1]) < 75)
         say("Khen Street is your starting point. Follow the gold markers!");
-      else say("Follow the gold markers toward Kaplan School.");
+      else say("Follow the markers, or explore a house and the scenery.");
     }
   }
   function creatureArt(creature) {
@@ -412,6 +529,31 @@
   function update(dt, time) {
     if (phase !== "playing") return;
     if (!mapOverlay.classList.contains("hidden") || !aboutOverlay.classList.contains("hidden")) return;
+    if (inside) {
+      const room = HouseRooms.layout(W, H);
+      const items = HouseRooms.objects(inside, room);
+      const down = name => keys.has(name) || touch.has(name);
+      let dx = Number(down("right")) - Number(down("left"));
+      let dy = Number(down("down")) - Number(down("up"));
+      if (dx || dy) {
+        const magnitude = Math.hypot(dx, dy);
+        dx /= magnitude; dy /= magnitude;
+        const nx = inside.x + dx * SPEED * dt;
+        const ny = inside.y + dy * SPEED * dt;
+        if (ny >= room.exitY && Math.abs(nx - room.exitX) < 27) {
+          leaveHouse(); return;
+        }
+        if (HouseRooms.canStand(nx, inside.y, room, items)) inside.x = nx;
+        if (HouseRooms.canStand(inside.x, ny, room, items)) inside.y = ny;
+        inside.facing = Math.abs(dx) > Math.abs(dy) ?
+          (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+        inside.step += dt * 9;
+        saveTimer += dt;
+        if (saveTimer > 1) { saveTimer = 0; save(); }
+      } else inside.step = 0;
+      if (message && time > messageUntil) message = "";
+      return;
+    }
     updatePeople(dt);
     const down = name => keys.has(name) || touch.has(name);
     let dx = Number(down("right")) - Number(down("left"));
@@ -577,21 +719,21 @@
     }
   }
   window.kaplanApplyMap = applyEditedMap;
-  function drawPlayer() {
-    const x = Math.round(player.x - camera.x);
-    const y = Math.round(player.y - camera.y);
-    const bob = player.step ? Math.floor(player.step) % 2 : 0;
+  function drawPlayer(x = Math.round(player.x - camera.x),
+                      y = Math.round(player.y - camera.y),
+                      facing = player.facing, step = player.step) {
+    const bob = step ? Math.floor(step) % 2 : 0;
     ctx.fillStyle = "#394a4d88";
     ctx.beginPath();
     ctx.ellipse(x, y + 4, 13, 5, 0, 0, Math.PI * 2);
     ctx.fill();
     if (playerArt.complete && playerArt.naturalWidth) {
-      const [sx, sy, sw, sh] = playerViews[player.facing];
+      const [sx, sy, sw, sh] = playerViews[facing];
       ctx.drawImage(playerArt, sx, sy, sw, sh, x - 19, y - 58 - bob, 38, 58);
       return;
     }
     // Matching code-drawn fallback in case the separate sprite image is missing.
-    const stride = Math.floor(player.step) % 2;
+    const stride = Math.floor(step) % 2;
     const pixels = [
       [3, 13 + stride, 3, 2, "#263247"], [7, 14 - stride, 3, 2, "#263247"],
       [3, 8, 7, 5, "#263247"], [4, 8, 5, 4, "#3878b3"],
@@ -599,18 +741,18 @@
       [9, 8, 2, 4, "#263247"], [2, 9, 1, 2, "#f3bd89"],
       [10, 9, 1, 2, "#f3bd89"], [3, 4, 7, 5, "#263247"],
     ];
-    if (player.facing === "up") {
+    if (facing === "up") {
       pixels.push([4, 3, 5, 5, "#4b3b40"], [4, 8, 5, 4, "#c73b41"],
         [5, 9, 3, 2, "#ef5a57"]);
     } else {
       pixels.push([4, 5, 5, 3, "#f3bd89"]);
-      if (player.facing === "down") {
+      if (facing === "down") {
         pixels.push([5, 6, 1, 1, "#263247"], [7, 6, 1, 1, "#263247"],
           [4, 7, 5, 2, "#4b3b40"], [5, 7, 3, 1, "#7c5845"]);
       } else {
-        pixels.push([player.facing === "left" ? 4 : 8, 6, 1, 1, "#263247"],
+        pixels.push([facing === "left" ? 4 : 8, 6, 1, 1, "#263247"],
           [4, 7, 5, 2, "#4b3b40"],
-          [player.facing === "left" ? 8 : 3, 8, 2, 4, "#c73b41"]);
+          [facing === "left" ? 8 : 3, 8, 2, 4, "#c73b41"]);
       }
     }
     pixels.push([3, 2, 7, 3, "#263247"], [4, 2, 5, 3, "#4b3b40"]);
@@ -619,8 +761,47 @@
       ctx.fillRect(x - 18 + px * 3, y - 45 - bob + py * 3, pw * 3, ph * 3);
     }
   }
+  function drawHud(label, prompt) {
+    const leftWidth = Math.min(211, Math.floor(W * .56));
+    const rightWidth = W < 540 ? 104 : 151;
+    panel(12, 12, leftWidth, 38);
+    ctx.fillStyle = "#25364b";
+    ctx.font = `bold ${W < 540 ? 15 : 17}px Consolas, monospace`;
+    let title = label;
+    while (title.length > 4 && ctx.measureText(title).width > leftWidth - 20)
+      title = title.slice(0, -2) + "…";
+    ctx.fillText(title, 23, 38);
+    panel(W - rightWidth - 12, 12, rightWidth, 38);
+    ctx.fillStyle = "#25364b";
+    ctx.fillText(`★ ${foundCount()}/3`, W - rightWidth - 2, 38);
+    const line = message && phase === "playing" ? message : prompt;
+    if (!line || phase !== "playing") return;
+    const boxY = W < 540 ? H - 203 : H - 75;
+    panel(12, boxY, W - 24, 63);
+    ctx.fillStyle = "#25364b";
+    ctx.font = `bold ${W < 540 ? 14 : 16}px Consolas, monospace`;
+    const words = line.split(/\s+/);
+    const lines = [""];
+    for (const word of words) {
+      const candidate = `${lines[lines.length - 1]} ${word}`.trim();
+      if (ctx.measureText(candidate).width > W - 52 && lines[lines.length - 1]) lines.push(word);
+      else lines[lines.length - 1] = candidate;
+    }
+    ctx.fillText(lines[0] || "", 25, boxY + 26);
+    if (lines[1]) ctx.fillText(lines.slice(1).join(" "), 25, boxY + 49, W - 50);
+  }
+  function drawInterior() {
+    const { room, items } = HouseRooms.draw(ctx, inside, W, H);
+    drawPlayer(Math.round(inside.x), Math.round(inside.y), inside.facing, inside.step);
+    const nearest = HouseRooms.nearest(inside.x, inside.y, room, items);
+    const prompt = nearest.distance < 59 ?
+      `A · ${nearest.item.kind === "exit" ? "Leave house" : `Examine ${nearest.item.kind}`}` :
+      "Explore the room · use A near furniture";
+    drawHud(houseName(inside.id).toUpperCase(), prompt);
+  }
   function draw(time) {
     ctx.imageSmoothingEnabled = false;
+    if (inside) { drawInterior(); return; }
     if (map.complete && map.naturalWidth) {
       ctx.drawImage(map, Math.round(camera.x), Math.round(camera.y), W, H,
         0, 0, W, H);
@@ -654,26 +835,20 @@
     }
     for (const person of people) if (isOpenPoint(person.x, person.y)) drawPerson(person);
     drawPlayer();
-    panel(12, 12, 211, 39);
-    ctx.fillStyle = "#25364b";
-    ctx.font = "bold 17px Consolas, monospace";
-    ctx.fillText(locationName(), 25, 39);
-    panel(477, 12, 151, 39);
-    ctx.fillStyle = "#25364b";
-    ctx.fillText(`★ ${foundCount()} / 3`, 495, 39);
-    if (message && phase === "playing") {
-      panel(16, 405, 608, 61);
-      ctx.fillStyle = "#25364b";
-      ctx.font = "bold 17px Consolas, monospace";
-      ctx.fillText(message, 32, 441);
-    } else if (phase === "playing" && distance(player.x, player.y, school.x, school.y) < 70) {
-      panel(16, 405, 608, 61);
-      ctx.fillStyle = "#25364b";
-      ctx.font = "bold 17px Consolas, monospace";
-      ctx.fillText("Press E / Enter / A to enter Kaplan School", 32, 441);
+    let prompt = "";
+    if (phase === "playing" && distance(player.x, player.y, school.x, school.y) < 70)
+      prompt = "A · Enter Kaplan School";
+    else if (phase === "playing") {
+      const nearest = nearestWorldThing();
+      if (nearest.kind === "house") prompt = "A · Enter house";
+      else if (nearest.kind === "person") prompt = `A · Talk to ${nearest.data.name}`;
+      else if (nearest.kind === "scenery") prompt = `A · Examine ${nearest.data[2]}`;
     }
+    drawHud(locationName(), prompt);
   }
   function tick(timestamp) {
+    controls.classList.toggle("hidden", phase !== "playing" || !battleOverlay.classList.contains("hidden") ||
+      !startOverlay.classList.contains("hidden") || !winOverlay.classList.contains("hidden"));
     if (startButton.disabled && map.naturalWidth) assetsReady();
     const seconds = timestamp / 1000;
     const dt = Math.min(0.05, lastTime ? seconds - lastTime : 0);
@@ -691,6 +866,10 @@
     if (event.code === "Escape" && !mapOverlay.classList.contains("hidden")) {
       closeMap(); return;
     }
+    if (event.code === "Escape" && gameMenu.classList.contains("open")) {
+      closeMenu(); return;
+    }
+    if (event.code === "Escape" && inside) { leaveHouse(); return; }
     const direction = keyMap[event.code];
     if (direction && mapOverlay.classList.contains("hidden") && aboutOverlay.classList.contains("hidden")) {
       event.preventDefault();
@@ -741,7 +920,20 @@
   document.getElementById("closeAboutButton").addEventListener("click", () => {
     aboutOverlay.classList.add("hidden");
   });
-  document.getElementById("mapButton").addEventListener("click", openMap);
+  function closeMenu() {
+    gameMenu.classList.remove("open");
+    menuButton.setAttribute("aria-expanded", "false");
+    menuButton.setAttribute("aria-label", "Open game menu");
+  }
+  menuButton.addEventListener("click", () => {
+    const open = gameMenu.classList.toggle("open");
+    menuButton.setAttribute("aria-expanded", String(open));
+    menuButton.setAttribute("aria-label", open ? "Close game menu" : "Open game menu");
+  });
+  gameMenu.addEventListener("click", event => {
+    if (event.target.closest("button")) closeMenu();
+  });
+  document.getElementById("mapButton").addEventListener("click", () => { closeMenu(); openMap(); });
   document.getElementById("closeMapButton").addEventListener("click", closeMap);
   const mapFileInput = document.getElementById("mapFileInput");
   document.getElementById("importMapButton").addEventListener("click", () => {
@@ -795,9 +987,27 @@
   window.kaplanBack = () => {
     if (!mapOverlay.classList.contains("hidden")) closeMap();
     else if (!aboutOverlay.classList.contains("hidden")) aboutOverlay.classList.add("hidden");
+    else if (gameMenu.classList.contains("open")) closeMenu();
     else if (phase === "battle") attack();
+    else if (inside) leaveHouse();
     else if (phase === "playing") { save(); say("Progress saved.", 2); }
   };
+  window.addEventListener("resize", () => requestAnimationFrame(() => {
+    const previousWidth = W, previousHeight = H;
+    if (window.matchMedia("(max-width: 540px)").matches) {
+      const bounds = canvas.getBoundingClientRect();
+      W = Math.max(1, Math.round(bounds.width));
+      H = Math.max(1, Math.round(bounds.height));
+    } else { W = 640; H = 480; }
+    if (W === previousWidth && H === previousHeight) return;
+    canvas.width = W; canvas.height = H;
+    if (inside) {
+      inside.x *= W / previousWidth;
+      inside.y *= H / previousHeight;
+    }
+    camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
+    camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
+  }));
   map.addEventListener("error", () => {
     document.querySelector(".overlay-card p").textContent =
       "Town artwork could not load. Check petah_tikva_town_map.png.";
@@ -820,7 +1030,9 @@
       mapLoaded: map.complete && map.naturalWidth > 0,
       maskLoaded: !!walkBits.length, peopleCount: people.length, peopleSeed,
       mapOpen: !mapOverlay.classList.contains("hidden"),
-      mapEdits: mapEdits.size,
+      mapEdits: mapEdits.size, interior: inside?.id ?? null,
+      houseCount: town.houses?.length ?? 0, sceneryCount: town.scenery?.length ?? 0,
+      snacks: buddy.snacks, roomX: inside?.x ?? null, roomY: inside?.y ?? null,
       message,
     });
     window.__siteSTest = {
@@ -835,6 +1047,18 @@
       firstPerson: () => people.length ? { x: people[0].x, y: people[0].y,
         name: people[0].name } : null,
       isWalkable: (x, y) => isOpenPoint(x, y),
+      enterHouse(id) {
+        const house = town.houses?.[id];
+        if (!house) return false;
+        player.x = house.entry[0]; player.y = house.entry[1];
+        if (!canStand(player.x, player.y)) return false;
+        enterHouse({ ...house, id });
+        return true;
+      },
+      roomObjects: () => inside ? HouseRooms.objects(inside, HouseRooms.layout(W, H)) : [],
+      setRoomPlayer(x, y) { if (!inside) return false; inside.x = x; inside.y = y; return true; },
+      setBuddy(hp, snacks) { buddy.hp = hp; buddy.snacks = snacks; updateStatus(); },
+      nearestInteraction: () => nearestWorldThing().kind,
     };
   }
   requestAnimationFrame(tick);

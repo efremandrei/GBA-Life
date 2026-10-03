@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="style.css">
   <script src="town_data.js" defer></script>
   <script src="map_grid.js" defer></script>
+  <script src="house_rooms.js" defer></script>
   <script src="game.js" defer></script>
 </head>
 <body>
@@ -20,8 +21,8 @@
       </div>
       <div class="top-actions">
         <button id="themeButton" class="small-button" type="button" aria-label="Switch to light skin">☀</button>
-        <button id="soundButton" class="small-button" type="button" aria-label="Turn sound on">♪ Off</button>
-        <button id="aboutButton" class="small-button" type="button">About</button>
+        <button id="mapButton" class="small-button" type="button">Map</button>
+        <button id="menuButton" class="small-button menu-toggle" type="button" aria-label="Open game menu" aria-controls="gameMenu" aria-expanded="false">☰</button>
       </div>
     </header>
 
@@ -32,7 +33,7 @@
           <div class="overlay-card">
             <span class="tag">NEW ADVENTURE</span>
             <h2>Reach Kaplan School</h2>
-            <p>Walk real Petah Tikva streets, meet townspeople, find three markers, and face two original creatures.</p>
+            <p>Walk Petah Tikva streets, explore houses, meet townspeople, find three markers, and face two original creatures.</p>
             <button id="startButton" class="primary-button" type="button">Start adventure</button>
             <button id="continueButton" class="secondary-button hidden" type="button">Continue saved game</button>
             <p class="overlay-hint">Arrow keys or WASD to move · E, Enter, or Space to interact</p>
@@ -63,7 +64,7 @@
           <div class="overlay-card about-card">
             <span class="tag">ABOUT</span>
             <h2>Kaplan Quest</h2>
-            <p>Version 0.4.0 (build 4). Original pixel-art walking adventure with editable map imports. Real street layout: © OpenStreetMap contributors (ODbL), checked against Google Maps. Buildings and scenery are stylized.</p>
+            <p>Version 0.5.0 (build 5). Original pixel-art walking adventure with enterable houses and editable map imports. Real street layout: © OpenStreetMap contributors (ODbL), checked against Google Maps. Buildings and scenery are stylized.</p>
             <p>Created for Andrei Efremuahkin · andrei.efr@gmail.com</p>
             <p id="repoLine">Repository: https://github.com/efremandrei/GBA-Life</p>
             <button id="closeAboutButton" class="primary-button" type="button">Close</button>
@@ -72,7 +73,7 @@
       </div>
       <div class="console-bottom">
         <div class="speaker" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-        <span class="console-label">MAP ADVENTURE · 04</span>
+        <span class="console-label">MAP ADVENTURE · 05</span>
       </div>
     </section>
 
@@ -90,9 +91,9 @@
         <span>INTERACT</span>
       </div>
     </section>
-    <div class="bottom-actions"><div class="bottom-buttons"><button id="restartButton" class="small-button" type="button">New game</button><button id="mapButton" class="small-button" type="button">Town map</button><button id="importMapButton" class="small-button" type="button">Import edited map</button><button id="originalMapButton" class="small-button" type="button">Original map</button></div><span id="mapStatus">Original map · progress saves automatically</span></div>
+    <div id="gameMenu" class="bottom-actions"><div class="bottom-buttons"><button id="restartButton" class="small-button" type="button">New game</button><button id="importMapButton" class="small-button" type="button">Import edited map</button><button id="originalMapButton" class="small-button" type="button">Original map</button><button id="soundButton" class="small-button" type="button" aria-label="Turn sound on">♪ Off</button><button id="aboutButton" class="small-button" type="button">About</button></div><span id="mapStatus">Original map · progress saves automatically</span></div>
     <input id="mapFileInput" type="file" accept=".json,application/json" class="hidden" aria-label="Choose edited map JSON">
-    <p class="help">Start near Khen Street. Find the Tzahal and HaTsoarim markers, then enter Kaplan School. Press A near townspeople to talk.</p>
+    <p class="help">Explore Petah Tikva. Press A near townspeople, houses, or scenery to interact. Find the route markers, then enter Kaplan School.</p>
     <div id="mapOverlay" class="map-overlay hidden" role="dialog" aria-modal="true" aria-label="Petah Tikva town map">
       <div class="map-card">
         <div class="map-heading"><div><p class="eyebrow">REAL STREETS · PIXEL WORLD</p><h2>Petah Tikva</h2></div><button id="closeMapButton" class="small-button" type="button">Close</button></div>

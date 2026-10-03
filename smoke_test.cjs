@@ -13,8 +13,94 @@ const path = require('path');
   await page.waitForFunction(() => window.__siteSDebug?.().mapLoaded && window.__siteSDebug?.().maskLoaded);
   await page.locator('#startButton').click();
   await page.waitForFunction(() => window.__siteSDebug().avatarLoaded);
+  await page.waitForFunction(() => !document.querySelector('.controls').classList.contains('hidden'));
   const beginning = await page.evaluate(() => window.__siteSDebug());
   if (beginning.peopleCount !== 145 || !beginning.peopleSeed) throw new Error('People were not generated');
+  const layout = await page.evaluate(() => {
+    const map = document.querySelector('#game').getBoundingClientRect();
+    const controls = document.querySelector('.controls').getBoundingClientRect();
+    return { mapShare: map.height / innerHeight, mapTop: map.top, mapBottom: map.bottom,
+      controlsTop: controls.top, controlsBottom: controls.bottom,
+      controlsOverMap: controls.top > map.top && controls.bottom <= map.bottom + 8 };
+  });
+  if (layout.mapShare < .7 || !layout.controlsOverMap) throw new Error(`Phone map is too small: ${JSON.stringify(layout)}`);
+  await page.locator('#menuButton').click();
+  if (!await page.locator('#gameMenu').isVisible()) throw new Error('Compact menu did not open');
+  await page.locator('#menuButton').click();
+  if (await page.locator('#gameMenu').isVisible()) throw new Error('Compact menu did not close');
+  if (beginning.houseCount < 200 || beginning.sceneryCount < 300)
+    throw new Error('House or scenery metadata is missing');
+  const inaccessible = await page.evaluate(() => {
+    const failed = [];
+    window.TOWN_DATA.houses.forEach((house, index) => {
+      if (!window.__siteSTest.setPlayer(...house.entry)) failed.push(index);
+    });
+    return failed;
+  });
+  if (inaccessible.length) throw new Error(`Houses without walkable entrances: ${inaccessible.slice(0, 12)}`);
+  if (!await page.evaluate(() => window.__siteSTest.enterHouse(0))) throw new Error('Could not enter house');
+  if ((await page.evaluate(() => window.__siteSDebug())).interior !== 0) throw new Error('House interior did not open');
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_house_v5.png') });
+  const roomObjects = await page.evaluate(() => window.__siteSTest.roomObjects());
+  const bed = roomObjects.find(item => item.kind === 'bed');
+  const chest = roomObjects.find(item => item.kind === 'chest');
+  await page.evaluate(({ x, y }) => {
+    window.__siteSTest.setBuddy(8, 1);
+    window.__siteSTest.setRoomPlayer(x, y);
+  }, { x: bed.x, y: bed.y + bed.h / 2 + 10 });
+  await page.keyboard.press('e');
+  if ((await page.evaluate(() => window.__siteSDebug())).hp !== 24) throw new Error('Bed did not restore Buddy HP');
+  await page.evaluate(({ x, y }) => window.__siteSTest.setRoomPlayer(x, y),
+    { x: chest.x, y: chest.y + chest.h / 2 + 10 });
+  await page.keyboard.press('e');
+  if ((await page.evaluate(() => window.__siteSDebug())).snacks !== 2) throw new Error('Chest did not give a snack');
+  await page.reload();
+  await page.waitForFunction(() => window.__siteSDebug?.().maskLoaded);
+  await page.locator('#continueButton').click();
+  if ((await page.evaluate(() => window.__siteSDebug())).interior !== 0) throw new Error('Interior did not survive resume');
+  await page.keyboard.press('Escape');
+  if ((await page.evaluate(() => window.__siteSDebug())).interior !== null) throw new Error('House exit failed');
+  const scenery = await page.evaluate(() => {
+    for (const item of window.TOWN_DATA.scenery) {
+      if (!['tree', 'shrub', 'flowers', 'lamp', 'sign', 'fountain'].includes(item[2])) continue;
+      for (const [dx, dy] of [[0, 0], [16, 0], [-16, 0], [0, 16], [0, -16], [28, 0], [-28, 0]]) {
+        if (window.__siteSTest.setPlayer(item[0] + dx, item[1] + dy) &&
+            window.__siteSTest.nearestInteraction() === 'scenery') return item[2];
+      }
+    }
+    return null;
+  });
+  if (!scenery) throw new Error('Could not approach any scenery object');
+  await page.keyboard.press('e');
+  const sceneryMessage = (await page.evaluate(() => window.__siteSDebug())).message;
+  if (!sceneryMessage || sceneryMessage.includes('Follow the markers'))
+    throw new Error(`Scenery did not respond: ${sceneryMessage}`);
+  const editedHouse = await page.evaluate(() => {
+    const width = 4096, height = 2304, tile = 32, cols = width / tile;
+    const [startX, startY] = window.TOWN_DATA.start;
+    for (let row = Math.floor(startY / tile) - 8; row <= Math.floor(startY / tile) + 8; row++) {
+      for (let col = Math.floor(startX / tile) - 8; col <= Math.floor(startX / tile) + 8; col++) {
+        const x = col * tile + 16, y = row * tile + 16;
+        if (Math.hypot(x - startX, y - startY) < 65 || !window.__siteSTest.isWalkable(x, y)) continue;
+        for (const [dx, dy] of [[32, 0], [-32, 0], [0, 32], [0, -32]]) {
+          if (!window.__siteSTest.isWalkable(x + dx, y + dy)) continue;
+          const index = row * cols + col;
+          const json = window.MapGrid.serialize(new Map([[index, 'house_blue']]), width, height);
+          if (!window.kaplanApplyMap(json)) continue;
+          if (window.__siteSTest.setPlayer(x + dx, y + dy) &&
+              window.__siteSTest.nearestInteraction() === 'house') return index;
+        }
+      }
+    }
+    return null;
+  });
+  if (editedHouse === null) throw new Error('Could not approach a house added in the editor');
+  await page.keyboard.press('e');
+  if ((await page.evaluate(() => window.__siteSDebug())).interior !== `edit-${editedHouse}`)
+    throw new Error('Editor-added house did not open');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => window.kaplanApplyMap(window.MapGrid.serialize(new Map(), 4096, 2304)));
+  await page.evaluate(([x, y]) => window.__siteSTest.setPlayer(x, y), [beginning.x, beginning.y]);
   const personBefore = await page.evaluate(() => window.__siteSTest.firstPerson());
   await page.waitForTimeout(300);
   const personAfter = await page.evaluate(() => window.__siteSTest.firstPerson());
@@ -26,10 +112,10 @@ const path = require('path');
   if (!(await page.evaluate(() => window.__siteSDebug().message)).startsWith(`${personAfter.name}:`))
     throw new Error('Townsperson did not talk');
   await page.evaluate(([x, y]) => window.__siteSTest.setPlayer(x, y), [beginning.x, beginning.y]);
-  await page.screenshot({ path: path.join(__dirname, 'docs/preview_start_v4.png') });
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_start_v5.png') });
   await page.locator('#mapButton').click();
   if (!await page.locator('#mapOverlay').isVisible()) throw new Error('Town map did not open');
-  await page.screenshot({ path: path.join(__dirname, 'docs/preview_map_v4.png') });
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_map_v5.png') });
   await page.keyboard.press('Escape');
   if (await page.locator('#mapOverlay').isVisible()) throw new Error('Town map did not close');
 
@@ -59,7 +145,7 @@ const path = require('path');
     if (state.markers !== i + 1) throw new Error(`Marker ${i} did not collect`);
     if (state.phase === 'battle') {
       battles++;
-      await page.screenshot({ path: path.join(__dirname, `docs/preview_battle_${battles}_v4.png`) });
+        await page.screenshot({ path: path.join(__dirname, `docs/preview_battle_${battles}_v5.png`) });
       for (let turn = 0; turn < 10; turn++) {
         if ((await page.evaluate(() => window.__siteSDebug())).phase !== 'battle') break;
         await page.locator('#attackButton').click();
@@ -78,7 +164,7 @@ const path = require('path');
   await page.keyboard.press('e');
   await page.waitForTimeout(200);
   const won = await page.locator('#winOverlay').isVisible();
-  await page.screenshot({ path: path.join(__dirname, 'docs/preview_win_v4.png') });
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_win_v5.png') });
   const mobileWidth = await page.evaluate(() => ({ viewport: innerWidth, content: document.documentElement.scrollWidth }));
   await page.locator('#playAgainButton').click();
   const newSeed = await page.evaluate(() => window.__siteSDebug().peopleSeed);

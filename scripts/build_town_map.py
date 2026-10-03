@@ -155,6 +155,24 @@ def main() -> None:
     od.rectangle((school_cx - 58, school_cy - 47, school_cx + 58, school_cy + 47), fill=255)
 
     roofs = ("house", "house_blue", "house_teal")
+    houses = []
+    scenery = []
+
+    def road_connection(door_x: int, door_y: int) -> tuple[int, int] | None:
+        """Find a short route from a new front door to the walkable street mask."""
+        for radius in range(1, 39):
+            for dx in range(-radius, radius + 1):
+                for dy in (-radius, radius):
+                    cx, cy = door_x + dx, door_y + dy
+                    if 0 <= cx < BASE_W and door_y <= cy < BASE_H and mask.getpixel((cx, cy)):
+                        return cx, cy
+            for dy in range(-radius + 1, radius):
+                for dx in (-radius, radius):
+                    cx, cy = door_x + dx, door_y + dy
+                    if 0 <= cx < BASE_W and door_y <= cy < BASE_H and mask.getpixel((cx, cy)):
+                        return cx, cy
+        return None
+
     made = 0
     for _ in range(30000):
         if made >= 950:
@@ -166,9 +184,19 @@ def main() -> None:
             continue
         if zone.getpixel((x + w // 2, y + h // 2)) in (1, 3):
             continue
-        house = sprite(RNG.choice(roofs), w + 8, h + 8)
+        door_x, door_y = x + w // 2, y + h + 4
+        connected = road_connection(door_x, door_y)
+        if connected is None:
+            continue
+        draw.line(((door_x, door_y), connected), fill="#e0d5b7", width=5)
+        md.line(((door_x, door_y), connected), fill=255, width=11)
+        md.ellipse((door_x - 5, door_y - 5, door_x + 5, door_y + 5), fill=255)
+        roof = RNG.choice(roofs)
+        house = sprite(roof, w + 8, h + 8)
         art.paste(house, (x - 4, y - 4), house)
         od.rectangle(box, fill=255)
+        houses.append({"entry": [door_x * SCALE, door_y * SCALE],
+                       "door": [door_x * SCALE, door_y * SCALE], "roof": roof})
         made += 1
 
     trees = 0
@@ -182,10 +210,12 @@ def main() -> None:
             continue
         if zone.getpixel((x, y)) == 3:
             continue
-        tree = sprite("tree" if RNG.random() < 0.74 else "shrub",
+        tree_kind = "tree" if RNG.random() < 0.74 else "shrub"
+        tree = sprite(tree_kind,
                       r * 2 + 4, r * 2 + 4)
         art.paste(tree, (x - r - 2, y - r - 2), tree)
         od.ellipse(box, fill=255)
+        scenery.append([x * SCALE, y * SCALE, tree_kind])
         trees += 1
 
     # The school is drawn over its OSM campus polygon. Its playable entry joins
@@ -199,6 +229,7 @@ def main() -> None:
     art.paste(school_art, (school_cx - 37, school_cy - 27), school_art)
     fountain = sprite("fountain", 20, 20)
     art.paste(fountain, (school_cx - 10, school_cy + 33), fountain)
+    scenery.append([school_cx * SCALE, (school_cy + 43) * SCALE, "fountain"])
     door_base = px(32.08952, 34.86965)
     road_base = px(32.08943, 34.86965)
     draw.line((door_base, road_base), fill="#e5d9af", width=9)
@@ -215,6 +246,7 @@ def main() -> None:
         flower = sprite("flowers", 12, 12)
         art.paste(flower, (x - 6, y - 6), flower)
         od.rectangle(box, fill=255)
+        scenery.append([x * SCALE, y * SCALE, "flowers"])
     for road in roads[::18]:
         road_points = points(road)
         if not road_points:
@@ -228,6 +260,7 @@ def main() -> None:
             continue
         lamp = sprite("lamp", 8, 18)
         art.paste(lamp, (x - 4, y - 9), lamp)
+        scenery.append([x * SCALE, y * SCALE, "lamp"])
 
     try:
         font = ImageFont.truetype("C:/Windows/Fonts/consola.ttf", 11)
@@ -253,6 +286,12 @@ def main() -> None:
     label("JABOTINSKY", 32.09128, 34.87520)
     label("BEILINSON", 32.08833, 34.86520)
     label("ECO LAKE", 32.09390, 34.86980)
+    scenery.extend([
+        [*px(32.08880, 34.87318, SCALE), "sign", "Khen Street"],
+        [*px(32.09054, 34.87137, SCALE), "sign", "Tzahal Street"],
+        [*px(32.08913, 34.86955, SCALE), "sign", "HaTsoarim Street"],
+        [*px(32.08795, 34.86810, SCALE), "sign", "Kaplan Street"],
+    ])
 
     art.resize((WORLD_W, WORLD_H), Image.Resampling.NEAREST).save(
         ASSETS / "petah_tikva_town_map.png", optimize=True)
@@ -292,6 +331,8 @@ def main() -> None:
             {"point": world(32.08937, 34.87052), "name": "HaTsoarim Street"},
         ],
         "npcPaths": npc_paths,
+        "houses": houses,
+        "scenery": scenery,
         "osmTimestamp": roads_raw.get("osm3s", {}).get("timestamp_osm_base"),
     }
     (ASSETS / "town_data.js").write_text(
@@ -308,8 +349,9 @@ def main() -> None:
                 "start": town["start"], "school": town["school"],
                 "markers": [marker["point"] for marker in town["markers"]],
             }, separators=(",", ":")) + ";\n", encoding="utf-8")
-    print(f"Map {WORLD_W}x{WORLD_H}: {len(roads)} roads, {made} buildings, "
-          f"{trees} trees, {len(npc_paths)} NPC paths. School at {town['school']}.")
+    print(f"Map {WORLD_W}x{WORLD_H}: {len(roads)} roads, {made} enterable houses, "
+          f"{trees} trees, {len(scenery)} scenery interactions, {len(npc_paths)} NPC paths. "
+          f"School at {town['school']}.")
 
 
 if __name__ == "__main__":

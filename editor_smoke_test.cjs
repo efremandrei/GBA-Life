@@ -78,6 +78,7 @@ const fs = require('fs');
   await game.locator('#startButton').click();
   await game.evaluate(() => window.__siteSTest.setPlayer(1539, 995));
   await game.screenshot({ path: path.join(__dirname, 'docs/game_edited_preview.png') });
+  await game.locator('#menuButton').click();
   await game.locator('#originalMapButton').click();
   if ((await game.evaluate(() => window.__siteSDebug())).mapEdits !== 0) throw new Error('Original map restore failed');
   if (await game.evaluate(() => window.kaplanApplyMap('{}'))) throw new Error('Invalid map accepted');
