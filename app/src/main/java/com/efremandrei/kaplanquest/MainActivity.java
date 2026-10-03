@@ -29,6 +29,9 @@ public final class MainActivity extends Activity {
                 startActivityForResult(intent, PICK_MAP);
             });
         }
+        @JavascriptInterface public void exitGame() {
+            runOnUiThread(() -> finish());
+        }
     }
 
     @Override public void onCreate(Bundle state) {
@@ -71,6 +74,11 @@ public final class MainActivity extends Activity {
 
     @Override public void onBackPressed() {
         if (game != null) game.evaluateJavascript("window.kaplanBack && window.kaplanBack()", null);
+    }
+
+    @Override protected void onPause() {
+        if (game != null) game.evaluateJavascript("window.kaplanSave && window.kaplanSave()", null);
+        super.onPause();
     }
 
     @Override public boolean onKeyDown(int keyCode, KeyEvent event) {

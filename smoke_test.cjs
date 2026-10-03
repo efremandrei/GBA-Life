@@ -26,6 +26,8 @@ const path = require('path');
   if (layout.mapShare < .7 || !layout.controlsOverMap) throw new Error(`Phone map is too small: ${JSON.stringify(layout)}`);
   await page.locator('#menuButton').click();
   if (!await page.locator('#gameMenu').isVisible()) throw new Error('Compact menu did not open');
+  if (!await page.locator('#exitButton').isVisible()) throw new Error('Exit Game is missing from the menu');
+  await page.screenshot({ path: path.join(__dirname, 'docs/preview_exit_menu_v7.png') });
   await page.locator('#menuButton').click();
   if (await page.locator('#gameMenu').isVisible()) throw new Error('Compact menu did not close');
   if (beginning.houseCount < 200 || beginning.sceneryCount < 300)
@@ -69,6 +71,22 @@ const path = require('path');
   await page.waitForFunction(() => window.__siteSDebug?.().maskLoaded);
   await page.locator('#continueButton').click();
   if ((await page.evaluate(() => window.__siteSDebug())).interior !== 0) throw new Error('Interior did not survive resume');
+  await page.evaluate(() => {
+    window.NativeGame = { exitGame() {
+      window.__savedAtExit = JSON.parse(localStorage.getItem('kaplan-quest-save-v2'));
+    } };
+  });
+  await page.locator('#menuButton').click();
+  await page.locator('#exitButton').click();
+  const exitSave = await page.evaluate(() => window.__savedAtExit);
+  if (!exitSave || exitSave.interior?.id !== 0 || exitSave.openedChests?.length !== 1 ||
+      exitSave.snacks !== 2 || exitSave.phase !== 'playing')
+    throw new Error(`Exit did not save before closing: ${JSON.stringify(exitSave)}`);
+  await page.reload();
+  await page.waitForFunction(() => window.__siteSDebug?.().maskLoaded);
+  await page.locator('#continueButton').click();
+  if ((await page.evaluate(() => window.__siteSDebug())).interior !== 0)
+    throw new Error('Exit Game save did not restore the house interior');
   await page.keyboard.press('Escape');
   if ((await page.evaluate(() => window.__siteSDebug())).interior !== null) throw new Error('House exit failed');
   const scenery = await page.evaluate(() => {

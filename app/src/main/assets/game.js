@@ -156,7 +156,33 @@
           facing: inside.facing, sourceX: inside.sourceX, sourceY: inside.sourceY } : null,
         openedChests: [...openedChests],
       }));
-    } catch (_error) { /* The game remains playable if storage is unavailable. */ }
+      return true;
+    } catch (_error) { return false; }
+  }
+  function saveProgress() {
+    return phase === "title" || save();
+  }
+  function exitGame() {
+    keys.clear();
+    touch.clear();
+    if (!saveProgress()) {
+      setMapStatus("Could not save progress. Check device storage.");
+      return;
+    }
+    if (window.NativeGame?.exitGame) {
+      window.NativeGame.exitGame();
+      return;
+    }
+    // Browser preview: return to the title screen with Continue available.
+    phase = "title";
+    inside = null;
+    battle = null;
+    battleOverlay.classList.add("hidden");
+    winOverlay.classList.add("hidden");
+    aboutOverlay.classList.add("hidden");
+    startOverlay.classList.remove("hidden");
+    if (savedGame()) continueButton.classList.remove("hidden");
+    closeMenu();
   }
   function savedGame() {
     try {
@@ -898,8 +924,9 @@
   });
   window.addEventListener("blur", () => { keys.clear(); touch.clear(); });
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && phase === "playing") save();
+    if (document.hidden) saveProgress();
   });
+  window.addEventListener("pagehide", saveProgress);
   for (const button of document.querySelectorAll(".dir")) {
     const direction = button.dataset.dir;
     button.addEventListener("pointerdown", event => {
@@ -927,8 +954,12 @@
   document.getElementById("attackButton").addEventListener("click", attack);
   document.getElementById("healButton").addEventListener("click", snack);
   document.getElementById("aboutButton").addEventListener("click", () => {
-    if (phase === "playing") { keys.clear(); touch.clear(); save(); }
+    if (phase !== "title") { keys.clear(); touch.clear(); save(); }
     aboutOverlay.classList.remove("hidden");
+  });
+  document.getElementById("exitButton").addEventListener("click", event => {
+    event.stopPropagation();
+    exitGame();
   });
   document.getElementById("closeAboutButton").addEventListener("click", () => {
     aboutOverlay.classList.add("hidden");
@@ -997,6 +1028,7 @@
   if (mapEdits.size) setMapStatus(`Edited map · ${mapEdits.size} blocks applied`);
   updateStatus();
   window.kaplanAction = interact;
+  window.kaplanSave = saveProgress;
   window.kaplanBack = () => {
     if (!mapOverlay.classList.contains("hidden")) closeMap();
     else if (!aboutOverlay.classList.contains("hidden")) aboutOverlay.classList.add("hidden");

@@ -1,10 +1,10 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.6.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.6.0/KaplanQuest-v0.6.0.apk) · [Download Petah Map Editor v1.3.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.6.0/PetahMapEditor-v1.3.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.6.0/KaplanQuest-source-v0.6.0.zip)
+[Download Kaplan Quest v0.7.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.7.0/KaplanQuest-v0.7.0.apk) · [Download Petah Map Editor v1.3.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.6.0/PetahMapEditor-v1.3.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.7.0/KaplanQuest-source-v0.7.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
-[32-tile editor sidebar](docs/editor_sidebar_scrolled_v1.3.0.png) · [Updated town view](docs/preview_start_v6.png) · [House interior](docs/preview_house_v6.png) · [City sprite sheet](art/town_sprite_sheet_city.png)
+[32-tile editor sidebar](docs/editor_sidebar_scrolled_v1.3.0.png) · [Updated town view](docs/preview_start_v6.png) · [Exit Game menu](docs/preview_exit_menu_v7.png) · [House interior](docs/preview_house_v6.png) · [City sprite sheet](art/town_sprite_sheet_city.png)
 
 An offline, original pixel-art walking game for Android. Explore a stylized part of **Petah Tikva** with a street network based on real map data. Start near Khen Street, collect markers at Khen, Tzahal, and HaTsoarim streets, and reach Kaplan School. The map covers approximately **32.081–32.096° N, 34.858–34.889° E** around the school; it is a game map of this area, not the entire city or a navigation map. Buildings, parks, and characters are decorative interpretations.
 
@@ -18,11 +18,11 @@ The refreshed base map adds walkable sidewalks and crossings, high buildings wit
 
 ## Play
 
-Install `KaplanQuest-v0.6.0.apk` on Android 8.0 or later. The town view fills most of a phone screen; the translucent D-pad and **A** button sit over its lower corners. Tap **Map** for the overview or **☰** for New game, Import, Original map, Sound, and About. On a computer, use arrow keys or WASD and E/Enter/Space.
+Install `KaplanQuest-v0.7.0.apk` on Android 8.0 or later. The town view fills most of a phone screen; the translucent D-pad and **A** button sit over its lower corners. Tap **Map** for the overview or **☰** for New game, Import, Original map, Sound, About, and **Exit Game**. Exit Game saves the current position, quest, room, inventory, and battle before closing the Android app. The game also saves when it goes into the background. On a computer, use arrow keys or WASD and E/Enter/Space.
 
 Approach a house entrance and press **A** to go inside. All 304 generated town houses, including the new high buildings, have a furnished room, with a bed that restores Buddy, a chest that can hold a snack, and furniture to examine. Press **A** at the door or use Android Back to leave. Houses placed with Petah Map Editor also open into rooms. Outside, **A** talks to townspeople and examines trees, flowers, lamps, street signs, transit stops, vehicles, playground equipment, hospitals, and the fountain. Around 145 varied townspeople move along the street paths; each new game randomizes their looks, positions, and dialogue. Two original creature encounters guard route markers. Progress, opened chests, the current room, and the chosen light or dark skin save locally.
 
-Version 0.6.0 keeps package ID `com.efremandrei.kaplanquest` and the original release signing key, increments `versionCode` to 6, and preserves saves from earlier versions. Existing 0.1.0 players are relocated to the Khen Street starting point because the map coordinates changed. The APK has no native libraries and supports arm64 Samsung devices in the supported Android range.
+Version 0.7.0 keeps package ID `com.efremandrei.kaplanquest` and the original release signing key, increments `versionCode` to 7, and preserves saves from earlier versions. Existing 0.1.0 players are relocated to the Khen Street starting point because the map coordinates changed. The APK has no native libraries and supports arm64 Samsung devices in the supported Android range.
 
 ## Edit the map in the separate app
 
@@ -39,6 +39,6 @@ The editor's local draft and the game's imported map are stored separately by An
 
 The project uses Java, Android Gradle Plugin 8.6.1, Gradle 8.7, and Android SDK 35. With `ANDROID_HOME` set, run `gradlew.bat :app:assembleRelease :editor:assembleRelease`. A signed release requires private `keystore.properties` and `kaplan-quest.keystore` in the repository root; neither is in Git or the source ZIP. Preserve this key for install-in-place updates to both apps. `scripts/build_town_map.py` regenerates and syncs the base map artwork and editor configuration.
 
-`smoke_test.cjs` checks the phone layout, all house entrances, new city objects and interactions, room persistence, and the game quest. `editor_smoke_test.cjs` checks the 32-tile scrollable side palette, paint/drag, undo/redo, editor persistence, JSON export/import, new crossing collision behavior, and mobile layout. Both use Playwright and Chrome with `NODE_PATH` pointing to a `playwright-core` installation. Android emulator screenshots are in `docs/`.
+`smoke_test.cjs` checks the phone layout, all house entrances, new city objects and interactions, Exit Game saving before Android closes, room persistence, and the game quest. `editor_smoke_test.cjs` checks the 32-tile scrollable side palette, paint/drag, undo/redo, editor persistence, JSON export/import, new crossing collision behavior, and mobile layout. Both use Playwright and Chrome with `NODE_PATH` pointing to a `playwright-core` installation. Android emulator screenshots are in `docs/`.
 
 The encounter creatures, scenery renderer, and game code are original. This project does not package Pokémon names or game artwork and does not yet include creature capture, a party system, or multiple towns.
