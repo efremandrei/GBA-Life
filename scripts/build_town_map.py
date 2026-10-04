@@ -141,6 +141,23 @@ def main():
   x,y=RNG.randrange(1,COLS-5),RNG.randrange(1,ROWS-5)
   if zones.get((x,y)) in {'park','water'}:continue
   high=len(houses)%10==0;place('high_building' if high else RNG.choice(['house','house_blue','house_teal']),x,y,3,4 if high else 3,True)
+ # Upgrade existing homes upward so IDs, doorways and saved house visits stay stable.
+ candidates=sorted(enumerate(houses),key=lambda pair:(pair[0]*73)%241)
+ for index,house in candidates:
+  if sum(h['roof']=='high_building' for h in houses)>=80:break
+  if house['roof']=='high_building':continue
+  bx,by,bw,bh=house['bounds'];x,y=bx//T,by//T
+  extra={(xx,y-1) for xx in range(x,x+3)}
+  if y<=1 or extra & used or any(zones.get(c) in {'park','water'} for c in extra):continue
+  for xx in range(x,x+3):
+   for yy in range(y-1,y+3):art.paste(terrain['grass'],(xx*T,yy*T))
+  im=sprite('high_building',96,128)
+  im.paste(terrain['grass'].crop((0,0,32,16)),(32,112))
+  im.paste(surface(5,True).crop((4,0,28,16)),(36,112))
+  art.paste(im,(bx,by-T),im);used.update(extra)
+  placement=next(p for p in placements if p['rect']==house['bounds'])
+  house['roof']='high_building';house['bounds']=[bx,by-T,bw,128]
+  placement['kind']='high_building';placement['rect']=house['bounds'].copy()
  # Grid-aligned park equipment and city objects; every prop has a reachable approach.
  sizes={'car':(2,2),'bike':(1,1),'traffic_light':(1,2),'bench':(2,1),'playground_slide':(2,2),'playground_swings':(3,2),'lamp':(1,2),'fountain':(2,2)}
  for kind,(w,h) in sizes.items():
@@ -157,14 +174,34 @@ def main():
  for c,kind in cells.items():
   if kind=='sidewalk':paint(c,kind)
  # Crossing tiles follow the direction of each selected orthogonal street segment.
- crossings=0
+ crossings=0;crossing_cells=set()
  for road in roads[::23]:
   route=geometry(road)
   for c in route[len(route)//2:]:
    if cells.get(c)!='road':continue
    im=sprite('crossing',T,T);a=route[max(0,route.index(c)-1)]
    if a[1]==c[1]:im=im.transpose(Image.Transpose.ROTATE_90)
-   art.paste(im,(c[0]*T,c[1]*T),im);crossings+=1;break
+   art.paste(im,(c[0]*T,c[1]*T),im);crossings+=1;crossing_cells.add(c);break
+ # Park cars inside straight road cells, leaving crossings, intersections and entrances clear.
+ vehicles=[];protected=[point(start),point(school),*[m['point'] for m in markers],*[h['entry'] for h in houses]]
+ vehicle_cells=[]
+ for x,y in sorted(cells,key=lambda c:(c[0]*101+c[1]*37)%997):
+  if len(vehicles)>=48:break
+  if cells[x,y]!='road' or (x,y) in crossing_cells:continue
+  road_mask=connection_mask((x,y),cells,{'road'})
+  if road_mask not in {5,10}:continue
+  sides=[(x-1,y),(x+1,y)] if road_mask==5 else [(x,y-1),(x,y+1)]
+  if not all(cells.get(c)=='sidewalk' for c in sides):continue
+  if any(math.dist(point((x,y)),p)<96 for p in protected):continue
+  if any(math.dist((x,y),c)<8 for c in vehicle_cells):continue
+  orientation='vertical' if road_mask==5 else 'horizontal'
+  im=sprite('car',20,30)
+  if orientation=='horizontal':im=im.transpose(Image.Transpose.ROTATE_90)
+  px,py=x*T+(T-im.width)//2,y*T+(T-im.height)//2
+  art.paste(im,(px,py),im)
+  rect=[px,py,im.width,im.height]
+  vehicles.append({'rect':rect,'cell':y*COLS+x,'orientation':orientation})
+  vehicle_cells.append((x,y));scenery.append([*point((x,y)),'car'])
  try:font=ImageFont.truetype('C:/Windows/Fonts/consolab.ttf',14)
  except OSError:font=ImageFont.load_default()
  for lat,lon,label in [(32.08880,34.87318,'KHEN ST'),(32.09054,34.87137,'TZAHAL ST'),(32.08913,34.86955,'HATSOARIM ST'),(32.08795,34.86810,'KAPLAN ST'),(32.09128,34.87520,'JABOTINSKY'),(32.09028,34.86928,'KAPLAN SCHOOL')]:
@@ -182,7 +219,7 @@ def main():
   if len(section)>1:npc.append([point(p) for p in section])
  bits=bytearray((COLS*ROWS+7)//8);mask=Image.new('L',(COLS,ROWS))
  for x,y in cells:idx=y*COLS+x;bits[idx>>3]|=1<<(idx&7);mask.putpixel((x,y),255)
- town={'width':W,'height':H,'gridSize':T,'mapRevision':'orthogonal-v1','maskScale':T,'maskWidth':COLS,'walkBits':base64.b64encode(bits).decode(),'bounds':{'south':SOUTH,'west':WEST,'north':NORTH,'east':EAST},'start':point(start),'school':point(school),'markers':markers,'npcPaths':npc,'houses':houses,'scenery':scenery,'placements':placements,'roadGrid':road_records,'osmTimestamp':roads_raw.get('osm3s',{}).get('timestamp_osm_base')}
+ town={'width':W,'height':H,'gridSize':T,'mapRevision':'orthogonal-v1','maskScale':T,'maskWidth':COLS,'walkBits':base64.b64encode(bits).decode(),'bounds':{'south':SOUTH,'west':WEST,'north':NORTH,'east':EAST},'start':point(start),'school':point(school),'markers':markers,'npcPaths':npc,'houses':houses,'scenery':scenery,'placements':placements,'vehicles':vehicles,'roadGrid':road_records,'osmTimestamp':roads_raw.get('osm3s',{}).get('timestamp_osm_base')}
  # Ensure all gameplay entrances remain reachable after the school footprint.
  reached=component(start)
  for anchor in [town['school'],*[m['point'] for m in markers],*[h['entry'] for h in houses]]:

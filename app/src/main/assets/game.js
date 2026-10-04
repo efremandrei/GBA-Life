@@ -186,6 +186,7 @@
   }
 
   const baseRoads=new Set(town.roadCells||[]),baseAccess=new Set(town.accessCells||[]),baseSidewalks=new Set(town.sidewalkCells||[]),basePaving=new Set(town.pavingCells||[]);
+  const roadVehicles = new Map((town.vehicles || []).map(vehicle => [vehicle.cell, vehicle.rect]));
   function seeded(seed) {
     let value = seed >>> 0;
     return () => ((value = (1664525 * value + 1013904223) >>> 0) / 4294967296);
@@ -374,6 +375,8 @@
     if(MapGrid.covered(mapEdits,tileX,tileY,WORLD_W/MapGrid.tileSize))return false;
     const override = mapEdits.get(tileY * (WORLD_W / MapGrid.tileSize) + tileX);
     if (override) return MapGrid.walkable.has(override);
+    const car = roadVehicles.get(tileY * (WORLD_W / MapGrid.tileSize) + tileX);
+    if (car && x >= car[0] && x < car[0]+car[2] && y >= car[1] && y < car[1]+car[3]) return false;
     const mx = Math.floor(x / town.maskScale);
     const my = Math.floor(y / town.maskScale);
     const index = my * town.maskWidth + mx;

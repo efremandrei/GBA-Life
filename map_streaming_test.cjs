@@ -13,7 +13,7 @@ const {pathToFileURL}=require('url');const path=require('path');const assert=req
  let maximum=0;
  for(const point of [points[0],points[50],points[100],points[150],points[200],[3920,2416]]){
    assert(await page.evaluate(p=>window.__siteSTest.setPlayer(...p),point));
-   await page.waitForFunction(()=>window.__siteSDebug().mapLoaded);
+   await page.waitForFunction(p=>window.__siteSDebug().mapStream.keys.includes(`${Math.floor(p[0]/1024)}_${Math.floor(p[1]/1024)}`) && window.__siteSDebug().mapLoaded,point);
    await page.waitForTimeout(100);
    const state=await page.evaluate(()=>window.__siteSDebug());
    assert(state.mapStream.keys.includes(`${Math.floor(point[0]/1024)}_${Math.floor(point[1]/1024)}`),'player block must load after travel');
@@ -36,7 +36,7 @@ const {pathToFileURL}=require('url');const path=require('path');const assert=req
  await recovery.waitForFunction(()=>window.__siteSDebug?.().mapStream.errors.length>0);
  await recovery.waitForFunction(()=>window.__siteSDebug().mapLoaded,{},{timeout:12000});
  assert(failed);await recovery.close();
- await page.screenshot({path:'docs/map_streaming_v16.png'});
+ await page.screenshot({path:'docs/map_streaming_v17.png'});
  console.log(JSON.stringify({maximumDecodedMapBytes:maximum,initial:initial.mapStream,final:await page.evaluate(()=>window.__siteSDebug().mapStream),fullMapRequests:0}));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import shutil
+from collections import deque
 
 from PIL import Image
 from grid_surfaces import surface
@@ -25,6 +26,26 @@ CITY_NAMES = (
 SIZE = 96
 TERRAIN = {"grass", "road", "path", "water", "plaza", "sidewalk", "crossing"}
 
+
+def isolate_sprite(source):
+    """Keep the main connected sprite, excluding overflow from adjacent sheet cells."""
+    alpha=source.getchannel('A'); width,height=source.size
+    seen=set(); largest=[]
+    for y in range(height):
+        for x in range(width):
+            if (x,y) in seen or alpha.getpixel((x,y))<=32:continue
+            queue=deque([(x,y)]);seen.add((x,y));component=[]
+            while queue:
+                px,py=queue.popleft();component.append((px,py))
+                for nx,ny in [(px-1,py),(px+1,py),(px,py-1),(px,py+1)]:
+                    if 0<=nx<width and 0<=ny<height and (nx,ny) not in seen and alpha.getpixel((nx,ny))>32:
+                        seen.add((nx,ny));queue.append((nx,ny))
+            if len(component)>len(largest):largest=component
+    if not largest:raise ValueError('Empty sprite')
+    clean=Image.new('RGBA',source.size)
+    src,dst=source.load(),clean.load()
+    for x,y in largest:dst[x,y]=src[x,y]
+    return clean.crop(clean.getchannel('A').getbbox())
 
 def main() -> None:
     atlas = Image.new("RGBA", (SIZE * 4, SIZE * 20))
@@ -54,7 +75,7 @@ def main() -> None:
                 bounds = source.getchannel("A").point(lambda value: 255 if value > 32 else 0).getbbox()
                 if not bounds:
                     raise ValueError(f"Empty sprite: {name}")
-                source = source.crop(bounds)
+                source = isolate_sprite(source)
                 scale = min((SIZE - 4) / source.width, (SIZE - 4) / source.height)
                 resized = source.resize((round(source.width * scale),
                                          round(source.height * scale)), Image.Resampling.NEAREST)
