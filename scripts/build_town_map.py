@@ -89,6 +89,7 @@ def main():
   for x in range(COLS):art.paste(terrain['water' if zones.get((x,y))=='water' and (x,y) not in cells else 'grass'],(x*T,y*T))
  def paint(c,kind):
   if kind=='road':im=surface(connection_mask(c,cells,{'road'}))
+  elif kind=='sidewalk':im=surface(connection_mask(c,cells,{'sidewalk','access','path','plaza','crossing'}),sidewalk=True)
   elif kind=='access':im=surface(connection_mask(c,cells,{'access','path','road','sidewalk','plaza'})| (1 if c in access_doors else 0),True)
   else:im=terrain[kind]
   art.paste(im,(c[0]*T,c[1]*T))
@@ -152,6 +153,9 @@ def main():
   if len(scenery)>700:break
   x,y=RNG.randrange(1,COLS-3),RNG.randrange(1,ROWS-3);kind=RNG.choice(['tree','tree','shrub','flowers']);size=2 if kind=='tree' else 1
   place(kind,x,y,size,size)
+ # Resolve sidewalk joins after all approaches and buildings are in place.
+ for c,kind in cells.items():
+  if kind=='sidewalk':paint(c,kind)
  # Crossing tiles follow the direction of each selected orthogonal street segment.
  crossings=0
  for road in roads[::23]:
@@ -189,12 +193,14 @@ def main():
    reached=component(start)
  town['walkBits']=base64.b64encode(bits).decode()
  town['roadCells']=[y*COLS+x for (x,y),kind in cells.items() if kind=='road']
+ town['pavingCells']=[y*COLS+x for (x,y),kind in cells.items() if kind in {'path','plaza'}]
+ town['sidewalkCells']=[y*COLS+x for (x,y),kind in cells.items() if kind=='sidewalk']
  town['accessCells']=[y*COLS+x for (x,y),kind in cells.items() if kind=='access']
  for c,kind in cells.items():
   if kind=='access':paint(c,kind)
  art.save(ASSETS/'petah_tikva_town_map.png',optimize=True);mask.save(ASSETS/'walkmask.png',optimize=True)
  (ASSETS/'town_data.js').write_text('window.TOWN_DATA = '+json.dumps(town,separators=(',',':'))+';\n',encoding='utf-8')
  editor=ROOT/'editor/src/main/assets';shutil.copyfile(ASSETS/'petah_tikva_town_map.png',editor/'petah_tikva_town_map.png');shutil.copyfile(ASSETS/'map_grid.js',editor/'map_grid.js')
- (editor/'editor_config.js').write_text('window.EDITOR_TOWN = '+json.dumps({k:town[k] for k in ['width','height','start','school','mapRevision','roadCells','accessCells']}|{'markers':[m['point'] for m in markers]},separators=(',',':'))+';\n',encoding='utf-8')
+ (editor/'editor_config.js').write_text('window.EDITOR_TOWN = '+json.dumps({k:town[k] for k in ['width','height','start','school','mapRevision','roadCells','accessCells','sidewalkCells','pavingCells']}|{'markers':[m['point'] for m in markers]},separators=(',',':'))+';\n',encoding='utf-8')
  print(f'Grid: {len(roads)} mapped roads; {len(houses)} houses; {len(scenery)} props; {len(npc)} NPC routes; start {town["start"]}; school {town["school"]}')
 if __name__=='__main__':main()

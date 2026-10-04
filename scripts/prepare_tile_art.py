@@ -1,4 +1,4 @@
-"""Cut both 4x4 town sprite sheets into a shared 4x16 game/editor atlas."""
+"""Cut both 4x4 town sprite sheets into a shared 4x20 game/editor atlas."""
 
 from pathlib import Path
 import shutil
@@ -27,7 +27,7 @@ TERRAIN = {"grass", "road", "path", "water", "plaza", "sidewalk", "crossing"}
 
 
 def main() -> None:
-    atlas = Image.new("RGBA", (SIZE * 4, SIZE * 16))
+    atlas = Image.new("RGBA", (SIZE * 4, SIZE * 20))
     tile_dir = ROOT / "art" / "tiles"
     tile_dir.mkdir(parents=True, exist_ok=True)
     for sheet_index, (sheet, names) in enumerate(((SOURCE, NAMES), (CITY_SOURCE, CITY_NAMES))):
@@ -63,17 +63,17 @@ def main() -> None:
                                                SIZE - resized.height - 2))
             tile.save(tile_dir / f"{name}.png", optimize=True)
             atlas.alpha_composite(tile, (col * SIZE, (sheet_index * 4 + row) * SIZE))
-    for offset,access in [(32,False),(48,True)]:
+    for offset,kind in [(32,"road"),(48,"access"),(64,"sidewalk")]:
         for mask in range(16):
-            tile=surface(mask,access).resize((SIZE,SIZE),Image.Resampling.NEAREST)
-            name=f"{'access' if access else 'road'}_{mask}"
+            tile=surface(mask,kind=="access",kind=="sidewalk").resize((SIZE,SIZE),Image.Resampling.NEAREST)
+            name=f"{kind}_{mask}"
             tile.save(tile_dir/f'{name}.png',optimize=True)
             atlas.alpha_composite(tile,(((offset+mask)%4)*SIZE,((offset+mask)//4)*SIZE))
     app_assets = ROOT / "app" / "src" / "main" / "assets"
     editor_assets = ROOT / "editor" / "src" / "main" / "assets"
     atlas.save(app_assets / "tile_atlas.png", optimize=True)
     shutil.copyfile(app_assets / "tile_atlas.png", editor_assets / "tile_atlas.png")
-    print(f"Prepared 64 art tiles and both app atlases.")
+    print(f"Prepared 80 art tiles and both app atlases.")
 
 
 if __name__ == "__main__":

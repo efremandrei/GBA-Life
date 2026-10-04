@@ -3,7 +3,7 @@
   const town = window.EDITOR_TOWN;
   if (!town) throw new Error("Town configuration is missing.");
   const WIDTH = town.width, HEIGHT = town.height, TILE = MapGrid.tileSize, COLS = WIDTH / TILE;
-  const baseRoads=new Set(town.roadCells||[]),baseAccess=new Set(town.accessCells||[]);
+  const baseRoads=new Set(town.roadCells||[]),baseAccess=new Set(town.accessCells||[]),baseSidewalks=new Set(town.sidewalkCells||[]),basePaving=new Set(town.pavingCells||[]);
   const SAVE_KEY = "petah-map-editor-v1";
   const canvas = document.getElementById("mapCanvas");
   const ctx = canvas.getContext("2d", { alpha: false });
@@ -75,7 +75,7 @@
     const firstY = Math.max(0, Math.floor(view.y / TILE)-4);
     const lastY = Math.min(HEIGHT / TILE - 1, Math.ceil((view.y + canvas.height / view.zoom) / TILE));
     for (let y = firstY; y <= lastY; y++) for (let x = firstX; x <= lastX; x++) {
-      const type = MapGrid.connectedType(edits,y*COLS+x,COLS,baseRoads,baseAccess);
+      const type = MapGrid.connectedType(edits,y*COLS+x,COLS,baseRoads,baseAccess,baseSidewalks,basePaving);
       if (type) MapGrid.drawTile(ctx, type, (x * TILE - view.x) * view.zoom,
         (y * TILE - view.y) * view.zoom, TILE * view.zoom,true);
     }
@@ -113,7 +113,7 @@
     for (const [index, type] of edits) {
       const x = index % COLS * TILE * scale;
       const y = Math.floor(index / COLS) * TILE * scale;
-      MapGrid.drawTile(navCtx, MapGrid.connectedType(edits,index,COLS,baseRoads,baseAccess), x, y, TILE * scale,true);
+      MapGrid.drawTile(navCtx, MapGrid.connectedType(edits,index,COLS,baseRoads,baseAccess,baseSidewalks,basePaving), x, y, TILE * scale,true);
     }
     navCtx.strokeStyle = "#fff1a1"; navCtx.lineWidth = 3;
     navCtx.strokeRect(view.x * scale, view.y * scale,
@@ -213,7 +213,7 @@
       swatchCtx.font = "bold 25px sans-serif";
       swatchCtx.fillText(name === "hand" ? "✥" : "×", 7, 25);
     }
-    const labels = { road:"Road (auto connect)",access:"Access path (24px)", house: "Red house", house_blue: "Blue house", house_teal: "Teal house",
+    const labels = { road:"Road (auto connect)",sidewalk:"Sidewalk (auto connect)",access:"Access path (24px)", house: "Red house", house_blue: "Blue house", house_teal: "Teal house",
       bike: "Bicycle", tram: "Light rail tram" };
     button.append(swatch, document.createTextNode(labels[name] ||
       name.replace(/_/g, " ").replace(/^./, letter => letter.toUpperCase())));

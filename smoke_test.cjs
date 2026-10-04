@@ -86,7 +86,7 @@ const path = require('path');
     }, {}),
     tileCount: window.MapGrid.types.length,
   }));
-  if (cityCounts.tileCount !== 44 || cityCounts.houses < 20 ||
+  if (cityCounts.tileCount !== 55 || cityCounts.houses < 20 ||
       ['hospital', 'bus_stop', 'tram_stop', 'tram', 'car', 'bike', 'playground_slide',
         'playground_swings', 'traffic_light', 'bench'].some(kind => !cityCounts.kinds[kind]))
     throw new Error(`New city assets are missing: ${JSON.stringify(cityCounts)}`);

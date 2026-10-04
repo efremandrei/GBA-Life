@@ -185,7 +185,7 @@
     }
   }
 
-  const baseRoads=new Set(town.roadCells||[]),baseAccess=new Set(town.accessCells||[]);
+  const baseRoads=new Set(town.roadCells||[]),baseAccess=new Set(town.accessCells||[]),baseSidewalks=new Set(town.sidewalkCells||[]),basePaving=new Set(town.pavingCells||[]);
   function seeded(seed) {
     let value = seed >>> 0;
     return () => ((value = (1664525 * value + 1013904223) >>> 0) / 4294967296);
@@ -817,7 +817,7 @@
       const cols = WORLD_W / MapGrid.tileSize;
       const worldX = index % cols * MapGrid.tileSize;
       const worldY = Math.floor(index / cols) * MapGrid.tileSize;
-      MapGrid.drawTile(overviewCtx, MapGrid.connectedType(mapEdits,index,cols,baseRoads,baseAccess), worldX / WORLD_W * overview.width,
+      MapGrid.drawTile(overviewCtx, MapGrid.connectedType(mapEdits,index,cols,baseRoads,baseAccess,baseSidewalks,basePaving), worldX / WORLD_W * overview.width,
         worldY / WORLD_H * overview.height, MapGrid.tileSize / WORLD_W * overview.width);
     }
     const point = (x, y, color, radius) => {
@@ -932,7 +932,7 @@
     const lastY = Math.min(WORLD_H / MapGrid.tileSize - 1,
       Math.ceil((camera.y + H) / MapGrid.tileSize));
     for (let tileY = firstY; tileY <= lastY; tileY++) for (let tileX = firstX; tileX <= lastX; tileX++) {
-      const type = MapGrid.connectedType(mapEdits,tileY*cols+tileX,cols,baseRoads,baseAccess);
+      const type = MapGrid.connectedType(mapEdits,tileY*cols+tileX,cols,baseRoads,baseAccess,baseSidewalks,basePaving);
       if (type) MapGrid.drawTile(ctx, type,
         tileX * MapGrid.tileSize - camera.x, tileY * MapGrid.tileSize - camera.y,MapGrid.tileSize,true);
     }
