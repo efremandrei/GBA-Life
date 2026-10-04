@@ -136,13 +136,13 @@
       button.querySelector("span").textContent=design.name;
       button.classList.toggle("selected", id===selectedCharacter);
       button.setAttribute("aria-pressed",String(id===selectedCharacter));
-      if (!design.original || !image?.naturalWidth) {
+      if (!design.original || !image?.naturalWidth || !walkFrames[id]?.down?.idle) {
         previewCtx.imageSmoothingEnabled=false;
         previewCtx.drawImage(CharacterDesign.sprite(design),9,5,46,70);
         continue;
       }
       previewCtx.imageSmoothingEnabled = false;
-      previewCtx.drawImage(image, ...characters[id].views.down, 9, 5, 46, 70);
+      previewCtx.drawImage(CharacterDesign.withHeadphones(walkFrames[id].down.idle,design,"down"),9,5,46,70);
     }
   }
   function selectCharacter(id) {
@@ -179,6 +179,7 @@
           leftForward ? 22 : 18, leftForward ? 42 : 46, 19, 14);
         return frame;
       });
+      walkFrames[id][facing].idle=base;
     }
   }
 
@@ -877,7 +878,7 @@
     ctx.ellipse(x, y + 4, 13, 5, 0, 0, Math.PI * 2);
     ctx.fill();
     const design = CharacterDesign.library[characterId];
-    if (!design.original || !characterArt[characterId]?.naturalWidth) {
+    if (!design.original || !characterArt[characterId]?.naturalWidth || !walkFrames[characterId]?.[facing]?.idle) {
       ctx.imageSmoothingEnabled=false;
       ctx.drawImage(CharacterDesign.sprite(design,facing,step>0?Math.floor(step)%2:-1),x-19,y-58-bob,38,58);
       return;
@@ -886,11 +887,11 @@
     if (art.complete && art.naturalWidth) {
       const walkFrame = step > 0 ? walkFrames[characterId]?.[facing]?.[Math.floor(step) % 2] : null;
       if (walkFrame) {
-        ctx.drawImage(walkFrame, x - 21, y - 58 - bob);
+        ctx.drawImage(CharacterDesign.withHeadphones(walkFrame,design,facing), x - 21, y - 58 - bob);
         return;
       }
       const [sx, sy, sw, sh] = characters[characterId].views[facing];
-      ctx.drawImage(art, sx, sy, sw, sh, x - 19, y - 58 - bob, 38, 58);
+      ctx.drawImage(CharacterDesign.withHeadphones(walkFrames[characterId][facing].idle,design,facing),x-19,y-58-bob,38,58);
       return;
     }
     // Matching code-drawn fallback in case the separate sprite image is missing.
@@ -1230,7 +1231,7 @@
     });
     window.__siteSTest = {
       walkFrameImage(id, facing, pose) {
-        return (CharacterDesign.library[id]?.original ? walkFrames[id]?.[facing]?.[pose] : CharacterDesign.sprite(CharacterDesign.library[id],facing,pose))?.toDataURL() || null;
+        return (CharacterDesign.library[id]?.original ? (walkFrames[id]?.[facing]?.[pose] && CharacterDesign.withHeadphones(walkFrames[id][facing][pose],CharacterDesign.library[id],facing)) : CharacterDesign.sprite(CharacterDesign.library[id],facing,pose))?.toDataURL() || null;
       },
       setPlayer(x, y) {
         if (!canStand(x, y)) return false;
