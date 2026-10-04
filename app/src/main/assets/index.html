@@ -10,6 +10,8 @@
   <script src="town_data.js" defer></script>
   <script src="map_grid.js" defer></script>
   <script src="house_rooms.js" defer></script>
+  <script src="character_design.js" defer></script>
+  <script src="character_studio.js" defer></script>
   <script src="game.js" defer></script>
 </head>
 <body>
@@ -48,6 +50,7 @@
               <button class="character-choice" type="button" data-character="amir" aria-pressed="false"><canvas width="64" height="80" aria-hidden="true"></canvas><span>Amir</span></button>
               <button class="character-choice" type="button" data-character="dana" aria-pressed="false"><canvas width="64" height="80" aria-hidden="true"></canvas><span>Dana</span></button>
             </div>
+            <button id="designCharacterButton" class="secondary-button" type="button">Design character</button>
             <button id="startButton" class="primary-button" type="button">Start adventure</button>
             <button id="continueButton" class="secondary-button hidden" type="button">Continue saved game</button>
             <p class="overlay-hint">Arrow keys or WASD to move · E, Enter, or Space to interact</p>
@@ -78,7 +81,7 @@
           <div class="overlay-card about-card">
             <span class="tag">ABOUT</span>
             <h2>Kaplan Quest</h2>
-            <p>Version 0.8.0 (build 8). Original pixel-art walking adventure with character choices, enterable houses, city scenery, and editable map imports. Real street layout: © OpenStreetMap contributors (ODbL), checked against Google Maps. Buildings and scenery are stylized.</p>
+            <p>Version 0.9.0 (build 9). Original pixel-art walking adventure with character choices, enterable houses, city scenery, and editable map imports. Real street layout: © OpenStreetMap contributors (ODbL), checked against Google Maps. Buildings and scenery are stylized.</p>
             <p>Created for Andrei Efremuahkin · andrei.efr@gmail.com</p>
             <p id="repoLine">Repository: https://github.com/efremandrei/GBA-Life</p>
             <button id="closeAboutButton" class="primary-button" type="button">Close</button>
@@ -105,7 +108,7 @@
         <span>INTERACT</span>
       </div>
     </section>
-    <div id="gameMenu" class="bottom-actions"><div class="bottom-buttons"><button id="restartButton" class="small-button" type="button">New game</button><button id="importMapButton" class="small-button" type="button">Import edited map</button><button id="originalMapButton" class="small-button" type="button">Original map</button><button id="soundButton" class="small-button" type="button" aria-label="Turn sound on">♪ Off</button><button id="aboutButton" class="small-button" type="button">About</button><button id="exitButton" class="small-button" type="button">Exit Game</button></div><span id="mapStatus">Original map · progress saves automatically</span></div>
+    <div id="gameMenu" class="bottom-actions"><div class="bottom-buttons"><button id="restartButton" class="small-button" type="button">New game</button><button id="importMapButton" class="small-button" type="button">Import edited map</button><button id="originalMapButton" class="small-button" type="button">Original map</button><button id="soundButton" class="small-button" type="button" aria-label="Turn sound on">♪ Off</button><button id="editCharacterButton" class="small-button" type="button">Character designer</button><button id="aboutButton" class="small-button" type="button">About</button><button id="exitButton" class="small-button" type="button">Exit Game</button></div><span id="mapStatus">Original map · progress saves automatically</span></div>
     <input id="mapFileInput" type="file" accept=".json,application/json" class="hidden" aria-label="Choose edited map JSON">
     <p class="help">Explore Petah Tikva. Press A near townspeople, houses, or scenery to interact. Find the route markers, then enter Kaplan School.</p>
     <div id="mapOverlay" class="map-overlay hidden" role="dialog" aria-modal="true" aria-label="Petah Tikva town map">

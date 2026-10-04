@@ -5,6 +5,7 @@ const path = require('path');
 (async () => {
   const browser = await chromium.launch({
     executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true,
+    args: ['--allow-file-access-from-files'],
   });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const errors = [];
@@ -20,6 +21,44 @@ const path = require('path');
   await page.screenshot({ path: path.join(__dirname, 'docs/preview_characters_v8.png') });
   await page.locator('#startButton').click();
   await page.waitForFunction(() => window.__siteSDebug().avatarLoaded);
+  await page.waitForFunction(() => ['andrei', 'maya', 'amir', 'dana'].every(id =>
+    ['down', 'up', 'left', 'right'].every(facing =>
+      window.__siteSTest.walkFrameImage(id, facing, 0) &&
+      window.__siteSTest.walkFrameImage(id, facing, 1))));
+  const repeatedWalkFrames = await page.evaluate(() => {
+    const repeated = [];
+    for (const id of ['andrei', 'maya', 'amir', 'dana'])
+      for (const facing of ['down', 'up', 'left', 'right'])
+        if (window.__siteSTest.walkFrameImage(id, facing, 0) ===
+            window.__siteSTest.walkFrameImage(id, facing, 1)) repeated.push(`${id}/${facing}`);
+    return repeated;
+  });
+  if (repeatedWalkFrames.length) throw new Error(`Walking poses are identical: ${repeatedWalkFrames}`);
+  await page.evaluate(() => {
+    const gallery = document.createElement('div');
+    gallery.id = 'walkPreview';
+    gallery.style.cssText = 'position:fixed;top:0;left:0;z-index:200;padding:12px;background:#17273b;color:#fff8dc;font:15px monospace';
+    gallery.innerHTML = '<h2 style="margin:0 0 8px">FRONT / BACK WALK CYCLE</h2>';
+    for (const id of ['andrei', 'maya', 'amir', 'dana']) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:65px repeat(4,70px);align-items:center;gap:5px;margin-bottom:5px';
+      const label = document.createElement('strong'); label.textContent = id; row.append(label);
+      for (const facing of ['down', 'up']) for (const pose of [0, 1]) {
+        const image = document.createElement('img');
+        image.src = window.__siteSTest.walkFrameImage(id, facing, pose);
+        image.width = 70; image.height = 103;
+        image.style.imageRendering = 'pixelated';
+        image.alt = `${id} ${facing} pose ${pose}`;
+        row.append(image);
+      }
+      gallery.append(row);
+    }
+    document.body.append(gallery);
+  });
+  await page.locator('#walkPreview').screenshot({ path: path.join(__dirname, 'docs/preview_walk_cycle_v9.png') });
+  await page.locator('#walkPreview').evaluate(node => node.remove());
+  if ((await page.evaluate(() => window.__siteSDebug())).walkFrame !== null)
+    throw new Error('Standing character should use the idle sprite');
   await page.waitForFunction(() => !document.querySelector('.controls').classList.contains('hidden'));
   const beginning = await page.evaluate(() => window.__siteSDebug());
   if (beginning.character !== 'maya') throw new Error('Selected character was not used in the game');
@@ -176,8 +215,11 @@ const path = require('path');
   if (await page.locator('#mapOverlay').isVisible()) throw new Error('Town map did not close');
 
   await page.keyboard.down('ArrowUp');
-  await page.waitForTimeout(360);
+  await page.waitForFunction(() => window.__siteSDebug().walkFrame === 0);
+  await page.waitForFunction(() => window.__siteSDebug().walkFrame === 1);
+  await page.waitForFunction(() => window.__siteSDebug().walkFrame === 0);
   await page.keyboard.up('ArrowUp');
+  await page.waitForFunction(() => window.__siteSDebug().walkFrame === null);
   const moved = await page.evaluate(() => window.__siteSDebug());
   if (moved.y >= beginning.y) throw new Error('Walking did not move player');
   await page.locator('#themeButton').click();

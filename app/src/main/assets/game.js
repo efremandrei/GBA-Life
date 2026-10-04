@@ -37,9 +37,13 @@
     } },
   };
   const characterArt = {};
+  const walkFrames = {};
   for (const [id, character] of Object.entries(characters)) {
     const image = new Image();
-    image.addEventListener("load", drawCharacterChoices);
+    image.addEventListener("load", () => {
+      buildWalkFrames(id);
+      drawCharacterChoices();
+    });
     image.src = character.source;
     characterArt[id] = image;
   }
@@ -112,24 +116,69 @@
   const chats = ["What a lovely day to walk!", "Have you seen the school?", "The streets are busy today.", "Try the town map if you get lost.", "Good luck on your adventure!", "I like the little park nearby."];
 
   function drawCharacterChoices() {
+    if (characterPicker.children.length !== Object.keys(CharacterDesign.library).length) {
+      characterPicker.replaceChildren();
+      for (const [id, design] of Object.entries(CharacterDesign.library)) {
+        const button = document.createElement("button");
+        button.className = "character-choice"; button.type = "button"; button.dataset.character = id;
+        const preview = document.createElement("canvas"); preview.width=64; preview.height=80;
+        const label = document.createElement("span"); label.textContent=design.name;
+        button.append(preview,label); characterPicker.append(button);
+      }
+    }
     for (const button of characterPicker.querySelectorAll(".character-choice")) {
       const id = button.dataset.character;
       const image = characterArt[id];
       const preview = button.querySelector("canvas");
       const previewCtx = preview.getContext("2d");
       previewCtx.clearRect(0, 0, preview.width, preview.height);
-      if (!image?.complete || !image.naturalWidth) continue;
+      const design = CharacterDesign.library[id];
+      button.querySelector("span").textContent=design.name;
+      button.classList.toggle("selected", id===selectedCharacter);
+      button.setAttribute("aria-pressed",String(id===selectedCharacter));
+      if (!design.original || !image?.naturalWidth) {
+        previewCtx.imageSmoothingEnabled=false;
+        previewCtx.drawImage(CharacterDesign.sprite(design),9,5,46,70);
+        continue;
+      }
       previewCtx.imageSmoothingEnabled = false;
       previewCtx.drawImage(image, ...characters[id].views.down, 9, 5, 46, 70);
     }
   }
   function selectCharacter(id) {
-    if (!Object.prototype.hasOwnProperty.call(characters, id)) return;
+    if (!Object.prototype.hasOwnProperty.call(CharacterDesign.library, id)) return;
     selectedCharacter = id;
     for (const button of characterPicker.querySelectorAll(".character-choice")) {
       const selected = button.dataset.character === id;
       button.classList.toggle("selected", selected);
       button.setAttribute("aria-pressed", String(selected));
+    }
+  }
+
+  function buildWalkFrames(id) {
+    const image = characterArt[id];
+    if (!image?.naturalWidth) return;
+    walkFrames[id] = {};
+    for (const [facing, crop] of Object.entries(characters[id].views)) {
+      const base = document.createElement("canvas");
+      base.width = 38; base.height = 58;
+      const baseCtx = base.getContext("2d");
+      baseCtx.imageSmoothingEnabled = false;
+      baseCtx.drawImage(image, ...crop, 0, 0, 38, 58);
+      walkFrames[id][facing] = [0, 1].map(pose => {
+        const frame = document.createElement("canvas");
+        frame.width = 42; frame.height = 62;
+        const frameCtx = frame.getContext("2d");
+        frameCtx.imageSmoothingEnabled = false;
+        // Keep the face and torso stable; move each lower leg in opposite phases.
+        frameCtx.drawImage(base, 0, 0, 38, 46, 2, 0, 38, 46);
+        const leftForward = pose === 0;
+        frameCtx.drawImage(base, 0, 44, 19, 14,
+          leftForward ? 0 : 4, leftForward ? 46 : 42, 19, 14);
+        frameCtx.drawImage(base, 19, 44, 19, 14,
+          leftForward ? 22 : 18, leftForward ? 42 : 46, 19, 14);
+        return frame;
+      });
     }
   }
 
@@ -150,7 +199,15 @@
       const segment = Math.floor(rand() * (path.length - 1));
       const from = path[segment], to = path[segment + 1];
       const t = rand();
-      people.push({ path, segment, t, direction: rand() < 0.5 ? -1 : 1,
+      const pick = list => list[Math.floor(rand()*list.length)];
+      const design = CharacterDesign.clean({ ...CharacterDesign.presets.andrei,
+        original:false, skin:pick(skinColors), hair:pick(hairColors),shirt:pick(shirtColors),
+        pants:pick(["#36536f","#454b54","#bd7395","#73844d"]),backpack:pick(shirtColors),
+        eyes:pick(["#68452b","#437fa5","#54764a"]),hairStyle:pick(CharacterDesign.enums.hairStyle),
+        facialHair:rand()<.72?"none":pick(["stubble","beard","moustache"]),
+        outfit:rand()<.25?"skirt":"trousers",wearGlasses:rand()<.3,
+        glasses:pick(["#272d37","#d075a2","#756198"]),wearBackpack:rand()<.5 });
+      people.push({ design, path, segment, t, direction: rand() < 0.5 ? -1 : 1,
         x: from[0] + (to[0] - from[0]) * t,
         y: from[1] + (to[1] - from[1]) * t,
         speed: 22 + rand() * 25, stride: rand() * 8,
@@ -259,7 +316,7 @@
     }
     peopleSeed = Number(state.peopleSeed) || 1878;
     generatePeople(peopleSeed);
-    characterId = Object.prototype.hasOwnProperty.call(characters, state.character)
+    characterId = Object.prototype.hasOwnProperty.call(CharacterDesign.library, state.character)
       ? state.character : "andrei";
     selectCharacter(characterId);
     player.facing = playerViews[state.facing] ? state.facing : "down";
@@ -493,6 +550,7 @@
     else say("You take a closer look at the scenery.", 4);
   }
   function interact() {
+    if(CharacterStudio.isOpen) return;
     if (!mapOverlay.classList.contains("hidden")) { closeMap(); return; }
     if (!aboutOverlay.classList.contains("hidden")) {
       aboutOverlay.classList.add("hidden");
@@ -632,7 +690,7 @@
   }
   function update(dt, time) {
     if (phase !== "playing") return;
-    if (!mapOverlay.classList.contains("hidden") || !aboutOverlay.classList.contains("hidden")) return;
+    if (CharacterStudio.isOpen || !mapOverlay.classList.contains("hidden") || !aboutOverlay.classList.contains("hidden")) return;
     if (inside) {
       const room = HouseRooms.layout(W, H);
       const items = HouseRooms.objects(inside, room);
@@ -642,6 +700,7 @@
       if (dx || dy) {
         const magnitude = Math.hypot(dx, dy);
         dx /= magnitude; dy /= magnitude;
+        const oldX = inside.x, oldY = inside.y;
         const nx = inside.x + dx * SPEED * dt;
         const ny = inside.y + dy * SPEED * dt;
         if (ny >= room.exitY && Math.abs(nx - room.exitX) < 27) {
@@ -651,7 +710,8 @@
         if (HouseRooms.canStand(inside.x, ny, room, items)) inside.y = ny;
         inside.facing = Math.abs(dx) > Math.abs(dy) ?
           (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
-        inside.step += dt * 9;
+        inside.step = Math.hypot(inside.x - oldX, inside.y - oldY) > 0.01
+          ? inside.step + dt * 7 : 0;
         saveTimer += dt;
         if (saveTimer > 1) { saveTimer = 0; save(); }
       } else inside.step = 0;
@@ -666,13 +726,15 @@
       const mag = Math.hypot(dx, dy);
       dx /= mag;
       dy /= mag;
+      const oldX = player.x, oldY = player.y;
       const nx = player.x + dx * SPEED * dt;
       const ny = player.y + dy * SPEED * dt;
       if (canStand(nx, player.y)) player.x = nx;
       if (canStand(player.x, ny)) player.y = ny;
       player.facing = Math.abs(dx) > Math.abs(dy)
         ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
-      player.step += dt * 9;
+      player.step = Math.hypot(player.x - oldX, player.y - oldY) > 0.01
+        ? player.step + dt * 7 : 0;
       saveTimer += dt;
       if (saveTimer > 1) { saveTimer = 0; save(); }
     } else {
@@ -741,31 +803,14 @@
     const x = Math.round(person.x - camera.x);
     const y = Math.round(person.y - camera.y);
     if (x < -25 || y < -45 || x > W + 25 || y > H + 25) return;
-    const stride = Math.floor(person.stride) % 2;
-    ctx.fillStyle = "#30444988";
-    ctx.fillRect(x - 8, y + 1, 16, 4);
-    ctx.fillStyle = "#26323d";
-    ctx.fillRect(x - 8, y - 28, 16, 28);
-    ctx.fillStyle = person.pants;
-    ctx.fillRect(x - 6, y - 11, 5, 11 + stride);
-    ctx.fillRect(x + 1, y - 11, 5, 12 - stride);
-    ctx.fillStyle = person.shirt;
-    ctx.fillRect(x - 8, y - 20, 16, 11);
-    ctx.fillStyle = person.skin;
-    ctx.fillRect(x - 6, y - 30, 12, 11);
-    ctx.fillRect(x - 10, y - 19, 3, 7);
-    ctx.fillRect(x + 7, y - 19, 3, 7);
-    ctx.fillStyle = person.hair;
-    ctx.fillRect(x - 7, y - 32, 14, 5);
-    ctx.fillRect(x - 7, y - 28, 2, 5);
-    ctx.fillStyle = "#25313b";
-    ctx.fillRect(x - 3, y - 25, 2, 2);
-    ctx.fillRect(x + 2, y - 25, 2, 2);
-    if (person.accessory) {
-      ctx.fillStyle = person.accessory;
-      ctx.fillRect(x + 6, y - 19, 4, 10);
-    }
+    const a=person.path[person.segment], b=person.path[person.segment+1];
+    const dx=(b[0]-a[0])*person.direction, dy=(b[1]-a[1])*person.direction;
+    const facing=Math.abs(dx)>Math.abs(dy)?(dx>0?"right":"left"):(dy>0?"down":"up");
+    ctx.fillStyle="#30444988";ctx.fillRect(x-9,y+1,18,4);
+    ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(CharacterDesign.sprite(person.design,facing,Math.floor(person.stride)%2),x-14,y-42,28,42);
   }
+
   function drawOverview() {
     if (!map.complete || !map.naturalWidth) return;
     overviewCtx.imageSmoothingEnabled = false;
@@ -831,8 +876,19 @@
     ctx.beginPath();
     ctx.ellipse(x, y + 4, 13, 5, 0, 0, Math.PI * 2);
     ctx.fill();
+    const design = CharacterDesign.library[characterId];
+    if (!design.original || !characterArt[characterId]?.naturalWidth) {
+      ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(CharacterDesign.sprite(design,facing,step>0?Math.floor(step)%2:-1),x-19,y-58-bob,38,58);
+      return;
+    }
     const art = characterArt[characterId];
     if (art.complete && art.naturalWidth) {
+      const walkFrame = step > 0 ? walkFrames[characterId]?.[facing]?.[Math.floor(step) % 2] : null;
+      if (walkFrame) {
+        ctx.drawImage(walkFrame, x - 21, y - 58 - bob);
+        return;
+      }
       const [sx, sy, sw, sh] = characters[characterId].views[facing];
       ctx.drawImage(art, sx, sy, sw, sh, x - 19, y - 58 - bob, 38, 58);
       return;
@@ -968,6 +1024,7 @@
     KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right",
   };
   window.addEventListener("keydown", event => {
+    if(CharacterStudio.isOpen) { if(event.code==="Escape") CharacterStudio.close(); return; }
     if (phase === "title" && event.target instanceof HTMLButtonElement && event.code !== "Escape") return;
     if (event.code === "Escape" && !mapOverlay.classList.contains("hidden")) {
       closeMap(); return;
@@ -1021,6 +1078,15 @@
     const choice = event.target.closest(".character-choice");
     if (choice) selectCharacter(choice.dataset.character);
   });
+  function openDesigner() {
+    keys.clear(); touch.clear(); saveProgress();
+    CharacterStudio.open(phase==="title"?selectedCharacter:characterId, id=>{
+      selectCharacter(id); if(phase!=="title") {characterId=id;saveProgress();}
+      drawCharacterChoices();
+    },()=>canvas.focus(),(id,facing,pose)=>walkFrames[id]?.[facing]?.[pose]);
+  }
+  document.getElementById("designCharacterButton").addEventListener("click",openDesigner);
+  document.getElementById("editCharacterButton").addEventListener("click",openDesigner);
   document.getElementById("actionButton").addEventListener("click", interact);
   document.getElementById("attackButton").addEventListener("click", attack);
   document.getElementById("healButton").addEventListener("click", snack);
@@ -1106,7 +1172,8 @@
   window.kaplanAction = interact;
   window.kaplanSave = saveProgress;
   window.kaplanBack = () => {
-    if (!mapOverlay.classList.contains("hidden")) closeMap();
+    if (CharacterStudio.isOpen) CharacterStudio.close();
+    else if (!mapOverlay.classList.contains("hidden")) closeMap();
     else if (!aboutOverlay.classList.contains("hidden")) aboutOverlay.classList.add("hidden");
     else if (gameMenu.classList.contains("open")) closeMenu();
     else if (phase === "battle") attack();
@@ -1147,8 +1214,11 @@
       x: Math.round(player.x), y: Math.round(player.y),
       markers: foundCount(), phase,
       hp: buddy.hp, enemyHp: battle?.hp ?? null,
-      avatarLoaded: characterArt[characterId].complete && characterArt[characterId].naturalWidth > 0,
+      avatarLoaded: !CharacterDesign.library[characterId].original || !!characterArt[characterId]?.naturalWidth,
       character: characterId, selectedCharacter,
+      facing: inside ? inside.facing : player.facing,
+      walkFrame: (inside ? inside.step : player.step) > 0
+        ? Math.floor(inside ? inside.step : player.step) % 2 : null,
       splashVisible: !splashScreen.classList.contains("hidden"),
       mapLoaded: map.complete && map.naturalWidth > 0,
       maskLoaded: !!walkBits.length, peopleCount: people.length, peopleSeed,
@@ -1159,6 +1229,9 @@
       message,
     });
     window.__siteSTest = {
+      walkFrameImage(id, facing, pose) {
+        return (CharacterDesign.library[id]?.original ? walkFrames[id]?.[facing]?.[pose] : CharacterDesign.sprite(CharacterDesign.library[id],facing,pose))?.toDataURL() || null;
+      },
       setPlayer(x, y) {
         if (!canStand(x, y)) return false;
         player.x = x; player.y = y;
@@ -1166,6 +1239,7 @@
         camera.y = clamp(y - H / 2, 0, WORLD_H - H);
         return true;
       },
+      peopleDesigns: () => people.map(person=>person.design),
       nearestPeople: () => people.filter(person => distance(person.x, person.y, player.x, player.y) < 320).length,
       firstPerson: () => people.length ? { x: people[0].x, y: people[0].y,
         name: people[0].name } : null,
