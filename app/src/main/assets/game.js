@@ -196,7 +196,9 @@
       x >= 8 && y >= 8 && x < WORLD_W - 8 && y < WORLD_H - 8));
     const nearby = paths.filter(path => path.some(([x, y]) =>
       distance(x, y, town.start[0], town.start[1]) < 600));
-    for (let i = 0; i < 145; i++) {
+    const homes=[...new Map(paths.flat().map(point=>[point.join(","),point])).values()].filter(([x,y])=>canStand(x,y));
+    const usedHomes=new Set();
+    for (let i = 0; i < Math.min(145,homes.length); i++) {
       const pool = i < 35 && nearby.length ? nearby : paths;
       const path = pool[Math.floor(rand() * pool.length)];
       const segment = Math.floor(rand() * (path.length - 1));
@@ -221,33 +223,23 @@
         accessory: rand() < 0.27 ? "#cc4847" : null,
         name: firstNames[Math.floor(rand() * firstNames.length)],
         chat: chats[Math.floor(rand() * chats.length)] });
+      const person=people[people.length-1];
+      const candidate=path[Math.min(path.length-1,segment+(t>=.5?1:0))];
+      const home=[candidate,...path].find(([x,y])=>canStand(x,y)&&!usedHomes.has(`${x},${y}`))
+        ||homes.find(([x,y])=>!usedHomes.has(`${x},${y}`));
+      usedHomes.add(home.join(","));
+      NpcBehavior.initialize(person,...home,seeded((seed ^ Math.imul(i+1,2654435761))>>>0));
     }
   }
+  function canNpcVisit(person,x,y) {
+    for(const t of [.25,.5,.75,1])
+      if(!canStand(person.homeX+(x-person.homeX)*t,person.homeY+(y-person.homeY)*t))return false;
+    if(distance(x,y,player.x,player.y)<16)return false;
+    return !people.some(other=>other!==person && (
+      distance(x,y,other.homeX,other.homeY)<1 || distance(x,y,other.targetX,other.targetY)<1 || distance(x,y,other.x,other.y)<20));
+  }
   function updatePeople(dt) {
-    for (const person of people) {
-      let remaining = person.speed * dt;
-      while (remaining > 0) {
-        const a = person.path[person.segment];
-        const b = person.path[person.segment + 1];
-        const length = Math.max(1, distance(a[0], a[1], b[0], b[1]));
-        const target = person.direction > 0 ? 1 : 0;
-        const fraction = Math.min(Math.abs(target - person.t), remaining / length);
-        person.t += person.direction * fraction;
-        remaining -= fraction * length;
-        if (Math.abs(person.t - target) < 0.00001) {
-          if (person.direction > 0 && person.segment < person.path.length - 2) {
-            person.segment++; person.t = 0;
-          } else if (person.direction < 0 && person.segment > 0) {
-            person.segment--; person.t = 1;
-          } else { person.direction *= -1; }
-        }
-        if (fraction === 0) break;
-      }
-      const a = person.path[person.segment], b = person.path[person.segment + 1];
-      person.x = a[0] + (b[0] - a[0]) * person.t;
-      person.y = a[1] + (b[1] - a[1]) * person.t;
-      person.stride += dt * person.speed / 8;
-    }
+    for(const person of people)NpcBehavior.update(person,dt,MapGrid.tileSize,canNpcVisit);
   }
 
   function save() {
@@ -810,12 +802,10 @@
     const x = Math.round(person.x - camera.x);
     const y = Math.round(person.y - camera.y);
     if (x < -25 || y < -45 || x > W + 25 || y > H + 25) return;
-    const a=person.path[person.segment], b=person.path[person.segment+1];
-    const dx=(b[0]-a[0])*person.direction, dy=(b[1]-a[1])*person.direction;
-    const facing=Math.abs(dx)>Math.abs(dy)?(dx>0?"right":"left"):(dy>0?"down":"up");
+    const facing=person.facing;
     ctx.fillStyle="#30444988";ctx.fillRect(x-9,y+1,18,4);
     ctx.imageSmoothingEnabled=false;
-    ctx.drawImage(CharacterDesign.worldSprite(CharacterDesign.sprite(person.design,facing,Math.floor(person.stride)%2)),x-12,y-32);
+    ctx.drawImage(CharacterDesign.worldSprite(CharacterDesign.sprite(person.design,facing,person.motion==="outbound"||person.motion==="return"?Math.floor(person.stride)%2:-1)),x-12,y-32);
   }
 
   function drawOverview() {
@@ -865,6 +855,7 @@
         save();
       }
       setMapStatus(`Edited map · ${mapEdits.size} blocks applied`);
+      if(phase!=="title")generatePeople(peopleSeed);
       drawOverview();
       say(`Edited map loaded: ${mapEdits.size} blocks.`, 4);
       return true;
@@ -1096,6 +1087,7 @@
     mapEdits = new Map();
     try { localStorage.removeItem(MAP_KEY); } catch (_error) { /* Session only. */ }
     setMapStatus("Original map restored");
+    if(phase!=="title")generatePeople(peopleSeed);
     if (!canStand(player.x, player.y)) {
       player.x = town.start[0]; player.y = town.start[1];
       camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
@@ -1208,6 +1200,8 @@
         return true;
       },
       worldSpriteImage: id => CharacterDesign.worldSprite(CharacterDesign.sprite(CharacterDesign.library[id])).toDataURL(),
+      advancePeople: seconds=>updatePeople(seconds),
+      npcState: ()=>people.map(({x,y,homeX,homeY,targetX,targetY,motion,timer,stride,facing})=>({x,y,homeX,homeY,targetX,targetY,motion,timer,stride,facing})),
       peopleDesigns: () => people.map(person=>person.design),
       nearestPeople: () => people.filter(person => distance(person.x, person.y, player.x, player.y) < 320).length,
       firstPerson: () => people.length ? { x: people[0].x, y: people[0].y,

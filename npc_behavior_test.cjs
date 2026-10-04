@@ -1,0 +1,14 @@
+const {chromium}=require('playwright-core');const {pathToFileURL}=require('url');const path=require('path');const assert=require('assert/strict');
+(async()=>{const b=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--allow-file-access-from-files']});const p=await b.newPage({viewport:{width:390,height:844}});const errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto(pathToFileURL(path.join(__dirname,'app/src/main/assets/index.html')).href+'?test');await p.waitForFunction(()=>window.__siteSDebug?.().splashVisible===false);await p.locator('#startButton').click();
+const results=await p.evaluate(()=>{
+ const one=NpcBehavior.initialize({},48,48,()=>.5);NpcBehavior.update(one,25,32,()=>true);const still=one.motion==='idle'&&one.x===48&&one.y===48&&one.stride===0;
+ NpcBehavior.update(one,1.4,32,()=>true);const walks=one.motion==='outbound'&&one.stride>0;NpcBehavior.update(one,.4,32,()=>true);const pause=one.motion==='pause'&&Math.hypot(one.x-48,one.y-48)===32&&one.stride===0;
+ NpcBehavior.update(one,5.5,32,()=>true);const returns=one.motion==='return';NpcBehavior.update(one,.8,32,()=>true);const home=one.motion==='idle'&&one.x===48&&one.y===48&&one.stride===0;
+ const blocked=NpcBehavior.initialize({},48,48,()=>.5);NpcBehavior.update(blocked,120,32,()=>false);
+ const directions=new Set();for(const random of [.01,.26,.51,.76]){const n=NpcBehavior.initialize({},48,48,()=>random);NpcBehavior.update(n,n.timer+.1,32,()=>true);directions.add(n.facing);}
+ const restricted=NpcBehavior.initialize({},48,48,()=>.5);NpcBehavior.update(restricted,26.1,32,(n,x,y)=>x===80&&y===48);
+ let samples=0,moving=0,maxDistance=0,unsafe=false;
+ for(let i=0;i<1200;i++){window.__siteSTest.advancePeople(.1);for(const n of window.__siteSTest.npcState()){samples++;moving+=n.motion==='outbound'||n.motion==='return';maxDistance=Math.max(maxDistance,Math.hypot(n.x-n.homeX,n.y-n.homeY));if(!window.__siteSTest.isWalkable(n.x,n.y))unsafe=true;}}
+ const npcs=window.__siteSTest.npcState();
+ return {still,walks,pause,returns,home,blocked:blocked.motion==='idle'&&blocked.x===48&&blocked.y===48,directions:directions.size,restricted:restricted.facing==='right',movingRatio:moving/samples,maxDistance,unsafe,unique:new Set(npcs.map(n=>`${n.homeX},${n.homeY}`)).size,count:npcs.length,onGrid:npcs.every(n=>n.homeX%32===16&&n.homeY%32===16)};
+});for(const key of ['still','walks','pause','returns','home','blocked','restricted','onGrid'])assert(results[key],key);assert.equal(results.directions,4);assert.equal(results.unsafe,false);assert.equal(results.count,145);assert.equal(results.unique,145);assert(results.maxDistance<=32.000001);assert(results.movingRatio<.1,JSON.stringify(results));assert.deepEqual(errors,[]);await p.screenshot({path:'docs/preview_idle_npcs_v12.png'});await b.close();console.log('PASS:',JSON.stringify(results));})().catch(e=>{console.error(e);process.exit(1)});
