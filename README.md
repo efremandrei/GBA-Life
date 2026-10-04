@@ -1,6 +1,6 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.15.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.15.0/KaplanQuest-v0.15.0.apk) · [Download Petah Map Editor v1.6.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.14.0/PetahMapEditor-v1.6.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.15.0/KaplanQuest-source-v0.15.0.zip)
+[Download Kaplan Quest v0.16.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.16.0/KaplanQuest-v0.16.0.apk) · [Download Petah Map Editor v1.6.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.14.0/PetahMapEditor-v1.6.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.16.0/KaplanQuest-source-v0.16.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
@@ -17,6 +17,14 @@ Version 0.14.0 keeps access paving at 24px from each house doorway to the street
 The editor shares this map and uses matching object footprints. Its hover outline shows the full stamp; erase its anchor cell to remove it. Imports check the complete footprint against protected quest paths. Older 4096 x 2304 editor drafts and JSON exports convert automatically: positions double, terrain patches expand to four cells, and objects become correctly scaled stamps.
 
 Old game saves retain character designs, markers, Buddy and inventory. Positions convert to the new scale or relocate to the start if blocked. Because houses were regenerated, old room locations and chest identities reset; carried snacks remain. Old map edits that obstruct new quest anchors are kept under the local pre-grid backup key and disabled. Exported originals remain available for revision and re-import.
+
+## Streamed map blocks
+
+Version 0.16.0 divides the 8192 x 4608 town into 40 PNG blocks, each at most 1024 x 1024 pixels (32 x 32 game cells). The game requests only blocks intersecting the camera viewport and releases Image references as blocks leave view. A stationary camera does not reload artwork. On a phone-sized viewport, at most four full-resolution blocks are resident: 16 MiB of decoded map pixels instead of 144 MiB for the entire raster. This is the map pixel budget, not total WebView memory; browser caches are managed by Android.
+
+The overview uses a separate 640 x 360 thumbnail. During a cold block load, the corresponding thumbnail region appears until the original pixels are ready. Failed block requests retry after three seconds. Collision geometry, NPC state, interiors, imported edits, and save coordinates remain continuous across block boundaries. The separate map editor keeps its complete master image for editing; the game APK does not include that master.
+
+`python scripts/split_town_map.py` rebuilds game blocks from the editor master. `build_town_map.py` also runs this split automatically after regenerating the town. `node map_streaming_test.cjs` verifies travel, eviction, bounded resident pixels, unchanged NPC seed, no full-raster requests, and failed-load recovery.
 
 ## Map sources
 
@@ -50,7 +58,7 @@ Street people have seeded haircuts, skin tones, outfits, eyes, facial hair, glas
 
 ## Play
 
-Install `KaplanQuest-v0.15.0.apk` on Android 8.0 or later. After the splash, choose from ten characters or create your own, then tap **Start adventure**. **Continue saved game** restores the character used in that save. The town view fills most of a phone screen; the translucent D-pad and **A** button sit over its lower corners. Tap **Map** for the overview or **☰** for New game, Import, Original map, Sound, About, and **Exit Game**. New game opens character selection before replacing the current save. Exit Game saves the current position, quest, room, inventory, and battle before closing the Android app. The game also saves when it goes into the background. On a computer, use arrow keys or WASD and E/Enter/Space.
+Install `KaplanQuest-v0.16.0.apk` on Android 8.0 or later. After the splash, choose from ten characters or create your own, then tap **Start adventure**. **Continue saved game** restores the character used in that save. The town view fills most of a phone screen; the translucent D-pad and **A** button sit over its lower corners. Tap **Map** for the overview or **☰** for New game, Import, Original map, Sound, About, and **Exit Game**. New game opens character selection before replacing the current save. Exit Game saves the current position, quest, room, inventory, and battle before closing the Android app. The game also saves when it goes into the background. On a computer, use arrow keys or WASD and E/Enter/Space.
 
 Approach a house entrance and press **A** to go inside. All 240 generated town houses, including the new high buildings, have a furnished room, with a bed that restores Buddy, a chest that can hold a snack, and furniture to examine. Press **A** at the door or use Android Back to leave. Houses placed with Petah Map Editor also open into rooms. Outside, **A** talks to townspeople and examines trees, flowers, lamps, street signs, transit stops, vehicles, playground equipment, hospitals, and the fountain. Around 145 varied townspeople mainly stand on their own grid tiles; each new game randomizes their looks, positions, and dialogue. Two original creature encounters guard route markers. Progress, opened chests, the current room, and the chosen light or dark skin save locally.
 

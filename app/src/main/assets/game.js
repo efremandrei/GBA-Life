@@ -11,8 +11,8 @@
   const ctx = canvas.getContext("2d", { alpha: false });
   const town = window.TOWN_DATA;
   if (!town) throw new Error("Town geometry is missing.");
-  const map = new Image();
-  map.src = "petah_tikva_town_map.png";
+  const mapStream = new TownStream(window.TOWN_BLOCKS);
+  const map = mapStream.overview;
   const walkBits = Uint8Array.from(atob(town.walkBits), character => character.charCodeAt(0));
   // Crops are aligned to the four transparent sprites generated from the supplied avatar.
   const playerViews = {
@@ -407,7 +407,7 @@
     }
   }
   function reset() {
-    if (!walkBits.length || !map.naturalWidth) return;
+    if (!walkBits.length || !mapStream.ready()) return;
     characterId = selectedCharacter;
     inside = null;
     openedChests.clear();
@@ -918,13 +918,7 @@
   function draw(time) {
     ctx.imageSmoothingEnabled = false;
     if (inside) { drawInterior(); return; }
-    if (map.complete && map.naturalWidth) {
-      ctx.drawImage(map, Math.round(camera.x), Math.round(camera.y), W, H,
-        0, 0, W, H);
-    } else {
-      ctx.fillStyle = "#91bb92";
-      ctx.fillRect(0, 0, W, H);
-    }
+    mapStream.draw(ctx, camera.x, camera.y, W, H);
     const cols = WORLD_W / MapGrid.tileSize;
     const firstX = Math.max(0, Math.floor(camera.x / MapGrid.tileSize)-4);
     const lastX = Math.min(cols - 1, Math.ceil((camera.x + W) / MapGrid.tileSize));
@@ -965,7 +959,7 @@
   function tick(timestamp) {
     controls.classList.toggle("hidden", phase !== "playing" || !battleOverlay.classList.contains("hidden") ||
       !startOverlay.classList.contains("hidden") || !winOverlay.classList.contains("hidden"));
-    if (startButton.disabled && map.naturalWidth) assetsReady();
+    if (startButton.disabled && mapStream.ready()) assetsReady();
     const seconds = timestamp / 1000;
     const dt = Math.min(0.05, lastTime ? seconds - lastTime : 0);
     lastTime = seconds;
@@ -1158,10 +1152,10 @@
   }));
   map.addEventListener("error", () => {
     document.querySelector(".overlay-card p").textContent =
-      "Town artwork could not load. Check petah_tikva_town_map.png.";
+      "Town overview could not load. Reopen the game to retry.";
   });
   function assetsReady() {
-    const ready = !!(walkBits.length && map.naturalWidth);
+    const ready = !!(walkBits.length && mapStream.ready());
     startButton.disabled = !ready;
     continueButton.disabled = !ready;
     if (ready) drawOverview();
@@ -1180,7 +1174,7 @@
       walkFrame: (inside ? inside.step : player.step) > 0
         ? Math.floor(inside ? inside.step : player.step) % 2 : null,
       splashVisible: !splashScreen.classList.contains("hidden"),
-      mapLoaded: map.complete && map.naturalWidth > 0,
+      mapLoaded: mapStream.ready(), mapStream: mapStream.stats(),
       maskLoaded: !!walkBits.length, peopleCount: people.length, peopleSeed,
       mapOpen: !mapOverlay.classList.contains("hidden"),
       characterSize: {width:24,height:32}, npcSize: {width:24,height:32},

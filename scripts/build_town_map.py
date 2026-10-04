@@ -198,9 +198,11 @@ def main():
  town['accessCells']=[y*COLS+x for (x,y),kind in cells.items() if kind=='access']
  for c,kind in cells.items():
   if kind=='access':paint(c,kind)
- art.save(ASSETS/'petah_tikva_town_map.png',optimize=True);mask.save(ASSETS/'walkmask.png',optimize=True)
+ art.save(ROOT/'editor/src/main/assets/petah_tikva_town_map.png',optimize=True);mask.save(ASSETS/'walkmask.png',optimize=True)
  (ASSETS/'town_data.js').write_text('window.TOWN_DATA = '+json.dumps(town,separators=(',',':'))+';\n',encoding='utf-8')
- editor=ROOT/'editor/src/main/assets';shutil.copyfile(ASSETS/'petah_tikva_town_map.png',editor/'petah_tikva_town_map.png');shutil.copyfile(ASSETS/'map_grid.js',editor/'map_grid.js')
+ from split_town_map import split_map
+ split_map()
+ editor=ROOT/'editor/src/main/assets';shutil.copyfile(ASSETS/'map_grid.js',editor/'map_grid.js')
  (editor/'editor_config.js').write_text('window.EDITOR_TOWN = '+json.dumps({k:town[k] for k in ['width','height','start','school','mapRevision','roadCells','accessCells','sidewalkCells','pavingCells']}|{'markers':[m['point'] for m in markers]},separators=(',',':'))+';\n',encoding='utf-8')
  print(f'Grid: {len(roads)} mapped roads; {len(houses)} houses; {len(scenery)} props; {len(npc)} NPC routes; start {town["start"]}; school {town["school"]}')
 if __name__=='__main__':main()
