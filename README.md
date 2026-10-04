@@ -1,12 +1,18 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.19.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.19.0/KaplanQuest-v0.19.0.apk) · [Download Petah Map Editor v1.9.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.19.0/PetahMapEditor-v1.9.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.19.0/KaplanQuest-source-v0.19.0.zip)
+[Download Kaplan Quest v0.19.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.19.0/KaplanQuest-v0.19.0.apk) · [Download Petah Map Editor v1.10.0](https://github.com/efremandrei/GBA-Life/releases/download/editor-v1.10.0/PetahMapEditor-v1.10.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/editor-v1.10.0/GBA-Life-source-editor-v1.10.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
 [Splash screen](docs/preview_splash_v8.png) · [Character chooser](docs/chooser_emulator_v10.png) · [55-tile editor sidebar](docs/preview_sidewalk_palette_v1.6.0.png) · [Connected sidewalks](docs/preview_sidewalks_v14.png) · [Exit Game menu](docs/preview_exit_menu_v7.png) · [House interior](docs/preview_house_v6.png) · [City sprite sheet](art/town_sprite_sheet_city.png)
 
 An offline, original pixel-art walking game for Android. Explore a stylized part of **Petah Tikva** with a street network based on real map data. Start near Khen Street, collect markers at Khen, Tzahal, and HaTsoarim streets, and reach Kaplan School. The map covers approximately **32.081–32.096° N, 34.858–34.889° E** around the school; it is a game map of this area, not the entire city or a navigation map. Buildings, parks, and characters are decorative interpretations.
+
+## Expandable map editor
+
+Editor v1.10.0 fills a tall editing area with the live map. The scrollable tile palette spans the same height. Minimize tiles hides the palette and expands the map to the full panel width; Show tiles restores it. Your chosen tool, edits, zoom and map center survive the resize, and the palette preference persists. The optional Overview button opens a small tap-to-jump map over the canvas. Zoom, School, undo/redo and import/export remain available below. Resizing or rotating redraws the map with matching horizontal/vertical scale, keeping square grid cells.
+
+[Palette open](docs/editor_expanded_height_v1.10.0.png) | [Palette minimized](docs/editor_tiles_minimized_v1.10.0.png). `node editor_layout_test.cjs` checks four viewport sizes, expansion, center/zoom preservation, painting near the bottom, undo, overview, saved collapse preference and rotation.
 
 ## Grid and scale
 

@@ -373,6 +373,44 @@
     theme(savedTheme);
     try { localStorage.setItem("petah-editor-theme", savedTheme); } catch (_error) { /* Session only. */ }
   });
+  const layout = document.querySelector(".editor-layout");
+  const sidebar = document.getElementById("tileSidebar");
+  const tilesButton = document.getElementById("tilesButton");
+  const overviewButton = document.getElementById("overviewButton");
+  function resizeMap() {
+    const box = canvas.getBoundingClientRect();
+    // Match both axes to the panel: never stretch a fixed 4:3 map into portrait.
+    const width = Math.max(1, Math.round(box.width * 2));
+    const height = Math.max(1, Math.round(box.height * 2));
+    if (canvas.width === width && canvas.height === height) return;
+    const centerX = view.x + canvas.width / (2 * view.zoom);
+    const centerY = view.y + canvas.height / (2 * view.zoom);
+    canvas.width = width; canvas.height = height;
+    view.x = centerX - width / (2 * view.zoom);
+    view.y = centerY - height / (2 * view.zoom);
+    hover = null;
+    draw();
+  }
+  function showTiles(show) {
+    sidebar.classList.toggle("hidden", !show);
+    layout.classList.toggle("tiles-minimized", !show);
+    tilesButton.textContent = show ? "Minimize tiles \u203a" : "\u2039 Show tiles";
+    tilesButton.setAttribute("aria-expanded", String(show));
+    resizeMap();
+  }
+  tilesButton.addEventListener("click", () => {
+    const show = sidebar.classList.contains("hidden");
+    showTiles(show);
+    try { localStorage.setItem("petah-editor-tiles-hidden", String(!show)); } catch (_) { /* Session only. */ }
+  });
+  overviewButton.addEventListener("click", () => {
+    const show = nav.classList.contains("hidden");
+    nav.classList.toggle("hidden", !show);
+    overviewButton.setAttribute("aria-expanded", String(show));
+  });
+  try { showTiles(localStorage.getItem("petah-editor-tiles-hidden") !== "true"); } catch (_) { showTiles(true); }
+  new ResizeObserver(resizeMap).observe(canvas);
+  resizeMap();
   map.addEventListener("load", draw);
   map.addEventListener("error", () => message("Base map artwork could not load."));
   if (map.complete && map.naturalWidth) draw();
