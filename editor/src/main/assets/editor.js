@@ -238,6 +238,27 @@
     draw();
   });
 
+  let pinchOrigin = null;
+  const pinch = PinchZoom(canvas, {
+    start(center) {
+      // The first finger may already have painted. Roll that uncommitted
+      // stroke back when a second finger changes the action to a pinch.
+      if(stroke)for(const [index,before] of stroke) {
+        if(before===null)edits.delete(index);else edits.set(index,before);
+      }
+      stroke=null;pointer=null;hover=null;
+      const point=canvasPoint({clientX:center.x,clientY:center.y});
+      pinchOrigin={zoom:view.zoom,x:view.x+point.x/view.zoom,y:view.y+point.y/view.zoom};
+      draw();
+    },
+    change(ratio,center) {
+      const point=canvasPoint({clientX:center.x,clientY:center.y});
+      view.zoom=clamp(pinchOrigin.zoom*ratio,.25,4);
+      view.x=pinchOrigin.x-point.x/view.zoom;view.y=pinchOrigin.y-point.y/view.zoom;
+      draw();
+    },
+    end() { hover=null;draw(); }
+  });
   canvas.addEventListener("pointerdown", event => {
     if (pointer) return;
     event.preventDefault(); canvas.setPointerCapture(event.pointerId);

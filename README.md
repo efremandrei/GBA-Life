@@ -1,12 +1,18 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.21.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.21.0/KaplanQuest-v0.21.0.apk) · [Download Petah Map Editor v1.12.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.21.0/PetahMapEditor-v1.12.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.21.0/KaplanQuest-source-v0.21.0.zip)
+[Download Kaplan Quest v0.22.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.22.0/KaplanQuest-v0.22.0.apk) · [Download Petah Map Editor v1.13.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.22.0/PetahMapEditor-v1.13.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.22.0/KaplanQuest-source-v0.22.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
 [Splash screen](docs/preview_splash_v8.png) · [Character chooser](docs/chooser_emulator_v10.png) · [55-tile editor sidebar](docs/preview_sidewalk_palette_v1.6.0.png) · [Connected sidewalks](docs/preview_sidewalks_v14.png) · [Exit Game menu](docs/preview_exit_menu_v7.png) · [House interior](docs/preview_house_v6.png) · [City sprite sheet](art/town_sprite_sheet_city.png)
 
 An offline, original pixel-art walking game for Android. Explore a stylized part of **Petah Tikva** with a street network based on real map data. Start near Khen Street, collect markers at Khen, Tzahal, and HaTsoarim streets, and reach Kaplan School. The map covers approximately **32.081–32.096° N, 34.858–34.889° E** around the school; it is a game map of this area, not the entire city or a navigation map. Buildings, parks, and characters are decorative interpretations.
+
+## Pinch to zoom
+
+Game v0.22.0 and editor v1.13.0 support two-finger pinch in/out on the map. The game supports 75%-250% zoom outdoors and inside houses; HUD and controls keep their size. Zoom is saved with progress, and movement recenters the camera. The editor supports 25%-400%, keeps the map point under your fingers, and cancels the initial paint stroke when the second finger joins. Single-finger painting, Hand panning, and zoom buttons still work.
+
+`node pinch_zoom_test.cjs` checks native browser multi-touch gestures, focal position, painting protection, gesture cancellation, game save/resume, house zoom, and the bounded map block memory budget. [Editor preview](docs/pinch_editor_v22.png) | [Game preview](docs/pinch_game_v22.png) | [House preview](docs/pinch_house_v22.png).
 
 ## Hen 14 and furnished homes
 

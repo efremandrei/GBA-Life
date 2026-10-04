@@ -60,8 +60,17 @@
   }));
   const school = { x: town.school[0], y: town.school[1] };
   const player = { x: town.start[0], y: town.start[1], facing: "down", step: 0 };
-  const camera = { x: clamp(player.x - W / 2, 0, WORLD_W - W),
-    y: clamp(player.y - H / 2, 0, WORLD_H - H) };
+  let worldZoom=1, gamePinch=null;
+  const roomView={x:0,y:0,zoom:1};
+  const viewWidth=()=>W/worldZoom,viewHeight=()=>H/worldZoom;
+  function boundView(value,limit,size) { return size>limit?(limit-size)/2:clamp(value,0,limit-size); }
+  function centerRoomView() {
+    if(!inside)return;
+    roomView.x=boundView(inside.x-W/(2*roomView.zoom),W,W/roomView.zoom);
+    roomView.y=boundView(inside.y-H/(2*roomView.zoom),H,H/roomView.zoom);
+  }
+  const camera = { x: clamp(player.x - viewWidth() / 2, 0, WORLD_W - viewWidth()),
+    y: clamp(player.y - viewHeight() / 2, 0, WORLD_H - viewHeight()) };
   const keys = new Set();
   const touch = new Set();
   const particles = [];
@@ -260,7 +269,7 @@
         markers: markers.map(marker => marker.found),
         hp: buddy.hp, snacks: buddy.snacks, phase,
         battle: battle ? { markerIndex: battle.markerIndex, hp: battle.hp } : null,
-        peopleSeed, cityTime,
+        peopleSeed, cityTime, worldZoom, roomZoom:roomView.zoom,
         interior: inside ? { id: inside.id, roof: inside.roof, x: inside.x, y: inside.y,
           facing: inside.facing, sourceX: inside.sourceX, sourceY: inside.sourceY } : null,
         openedChests: [...openedChests],
@@ -314,6 +323,8 @@
   function resume() {
     const state = savedGame();
     if (!state || !Number.isFinite(state.x) || !Number.isFinite(state.y)) return reset();
+    worldZoom=clamp(Number(state.worldZoom)||1,.75,2.5);
+    roomView.zoom=clamp(Number(state.roomZoom)||1,.75,2.5);
     const changedMap=state.mapRevision!==town.mapRevision;
     const factor=changedMap?2:1;
     player.x = clamp(state.x*factor, 8, WORLD_W - 8);
@@ -351,8 +362,9 @@
         inside.x = room.exitX; inside.y = room.exitY - 50;
       }
     }
-    camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
-    camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
+    camera.x = clamp(player.x - viewWidth() / 2, 0, WORLD_W - viewWidth());
+    camera.y = clamp(player.y - viewHeight() / 2, 0, WORLD_H - viewHeight());
+    centerRoomView();
     phase = state.phase === "won" ? "won" : "playing";
     startOverlay.classList.add("hidden");
     winOverlay.classList.toggle("hidden", phase !== "won");
@@ -440,8 +452,8 @@
     player.y = town.start[1];
     player.facing = "down";
     player.step = 0;
-    camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
-    camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
+    camera.x = clamp(player.x - viewWidth() / 2, 0, WORLD_W - viewWidth());
+    camera.y = clamp(player.y - viewHeight() / 2, 0, WORLD_H - viewHeight());
     markers.forEach(marker => { marker.found = false; });
     buddy.hp = buddy.maxHp;
     buddy.snacks = 2;
@@ -480,6 +492,7 @@
     inside = { id: house.id, roof: house.roof, x: room.exitX,
       y: room.exitY - 50, facing: "up", step: 0,
       sourceX: player.x, sourceY: player.y };
+    centerRoomView();
     keys.clear(); touch.clear();
     say(`${houseName(house.id)}: explore the room. A examines objects.`, 4);
     save();
@@ -488,8 +501,8 @@
     if (!inside) return;
     player.x = canStand(inside.sourceX, inside.sourceY) ? inside.sourceX : town.start[0];
     player.y = canStand(inside.sourceX, inside.sourceY) ? inside.sourceY : town.start[1];
-    camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
-    camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
+    camera.x = clamp(player.x - viewWidth() / 2, 0, WORLD_W - viewWidth());
+    camera.y = clamp(player.y - viewHeight() / 2, 0, WORLD_H - viewHeight());
     inside = null;
     keys.clear(); touch.clear();
     say("Back outside in Petah Tikva.", 2.5);
@@ -674,8 +687,8 @@
         battle = null;
         buddy.hp = buddy.maxHp;
         player.x = town.start[0]; player.y = town.start[1];
-        camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
-        camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
+        camera.x = clamp(player.x - viewWidth() / 2, 0, WORLD_W - viewWidth());
+        camera.y = clamp(player.y - viewHeight() / 2, 0, WORLD_H - viewHeight());
         phase = "playing";
         updateStatus(); save();
         say("Your Buddy recovered. Try the route again!", 4);
@@ -727,6 +740,7 @@
   function update(dt, time, elapsed = dt) {
     if (phase === "playing" || phase === "battle") cityTime += elapsed;
     if (phase !== "playing") return;
+    if (gamePinch?.active) { player.step=0; if(inside)inside.step=0; return; }
     if (CharacterStudio.isOpen || !mapOverlay.classList.contains("hidden") || !aboutOverlay.classList.contains("hidden")) return;
     if (inside) {
       const room = HouseRooms.layout(W, H);
@@ -745,6 +759,7 @@
         }
         if (HouseRooms.canStand(nx, inside.y, room, items)) inside.x = nx;
         if (HouseRooms.canStand(inside.x, ny, room, items)) inside.y = ny;
+        centerRoomView();
         inside.facing = Math.abs(dx) > Math.abs(dy) ?
           (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
         inside.step = Math.hypot(inside.x - oldX, inside.y - oldY) > 0.01
@@ -778,11 +793,13 @@
     } else {
       player.step = 0;
     }
-    const targetX = clamp(player.x - W / 2, 0, WORLD_W - W);
-    const targetY = clamp(player.y - H / 2, 0, WORLD_H - H);
+    const targetX = clamp(player.x - viewWidth() / 2, 0, WORLD_W - viewWidth());
+    const targetY = clamp(player.y - viewHeight() / 2, 0, WORLD_H - viewHeight());
     const ease = Math.min(1, dt * 8);
-    camera.x += (targetX - camera.x) * ease;
-    camera.y += (targetY - camera.y) * ease;
+    if(dx || dy) {
+      camera.x += (targetX - camera.x) * ease;
+      camera.y += (targetY - camera.y) * ease;
+    }
 
     for (const [index, marker] of markers.entries()) {
       if (!marker.found && distance(player.x, player.y, marker.x, marker.y) < 23) {
@@ -840,7 +857,7 @@
   function drawPerson(person) {
     const x = Math.round(person.x - camera.x);
     const y = Math.round(person.y - camera.y);
-    if (x < -25 || y < -45 || x > W + 25 || y > H + 25) return;
+    if (x < -25 || y < -45 || x > viewWidth() + 25 || y > viewHeight() + 25) return;
     const facing=person.facing;
     ctx.fillStyle="#394a4d88";ctx.beginPath();ctx.ellipse(x,y+3,9,3,0,0,Math.PI*2);ctx.fill();
     ctx.imageSmoothingEnabled=false;
@@ -889,8 +906,8 @@
       localStorage.setItem(MAP_KEY, MapGrid.serialize(mapEdits, WORLD_W, WORLD_H));
       if (!canStand(player.x, player.y)) {
         player.x = town.start[0]; player.y = town.start[1];
-        camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
-        camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
+        camera.x = clamp(player.x - viewWidth() / 2, 0, WORLD_W - viewWidth());
+        camera.y = clamp(player.y - viewHeight() / 2, 0, WORLD_H - viewHeight());
         save();
       }
       setMapStatus(`Edited map · ${mapEdits.size} blocks applied`);
@@ -945,8 +962,11 @@
     if (lines[1]) ctx.fillText(lines.slice(1).join(" "), 25, boxY + 49, W - 50);
   }
   function drawInterior() {
+    ctx.fillStyle='#18313a';ctx.fillRect(0,0,W,H);
+    ctx.save();ctx.scale(roomView.zoom,roomView.zoom);ctx.translate(-roomView.x,-roomView.y);
     const { room, items } = HouseRooms.draw(ctx, inside, W, H);
     drawPlayer(Math.round(inside.x), Math.round(inside.y), inside.facing, inside.step);
+    ctx.restore();
     const nearest = HouseRooms.nearest(inside.x, inside.y, room, items);
     const prompt = nearest.distance < 59 ?
       `A · ${nearest.item.kind === "exit" ? "Leave house" : `Examine ${nearest.item.kind}`}` :
@@ -957,7 +977,7 @@
     if (!tramService) return;
     for (const stop of tramService.stops) {
       const x=Math.round(stop.point[0]-camera.x),y=Math.round(stop.point[1]-camera.y);
-      if(x < -150 || y < -90 || x > W+150 || y > H+90)continue;
+      if(x < -150 || y < -90 || x > viewWidth()+150 || y > viewHeight()+90)continue;
       const seconds=Math.ceil(tramService.nextArrival(stop.name,cityTime));
       ctx.fillStyle='#344a58';ctx.fillRect(x-64,y-76,128,30);
       ctx.fillStyle='#fff6dc';ctx.fillRect(x-62,y-74,124,26);
@@ -968,20 +988,21 @@
     }
     const tram=tramService.state(cityTime),x=Math.round(tram.x-camera.x),y=Math.round(tram.y-camera.y);
     const image=tramArt[tram.facing];
-    if(image.naturalWidth && x>-90 && y>-90 && x<W+90 && y<H+90){
+    if(image.naturalWidth && x>-90 && y>-90 && x<viewWidth()+90 && y<viewHeight()+90){
       ctx.drawImage(image,x-image.width/2,y-image.height/2);
     }
   }
   function draw(time) {
     ctx.imageSmoothingEnabled = false;
     if (inside) { drawInterior(); return; }
-    mapStream.draw(ctx, camera.x, camera.y, W, H);
+    ctx.save();ctx.scale(worldZoom,worldZoom);
+    mapStream.draw(ctx, camera.x, camera.y, viewWidth(), viewHeight());
     const cols = WORLD_W / MapGrid.tileSize;
     const firstX = Math.max(0, Math.floor(camera.x / MapGrid.tileSize)-4);
-    const lastX = Math.min(cols - 1, Math.ceil((camera.x + W) / MapGrid.tileSize));
+    const lastX = Math.min(cols - 1, Math.ceil((camera.x + viewWidth()) / MapGrid.tileSize));
     const firstY = Math.max(0, Math.floor(camera.y / MapGrid.tileSize)-4);
     const lastY = Math.min(WORLD_H / MapGrid.tileSize - 1,
-      Math.ceil((camera.y + H) / MapGrid.tileSize));
+      Math.ceil((camera.y + viewHeight()) / MapGrid.tileSize));
     for (let tileY = firstY; tileY <= lastY; tileY++) for (let tileX = firstX; tileX <= lastX; tileX++) {
       const type = MapGrid.connectedType(mapEdits,tileY*cols+tileX,cols,baseRoads,baseAccess,baseSidewalks,basePaving);
       if (type) MapGrid.drawTile(ctx, type,
@@ -1003,6 +1024,7 @@
     for (const person of people) if (isOpenPoint(person.x, person.y)) drawPerson(person);
     drawTransit();
     drawPlayer();
+    ctx.restore();
     let prompt = "";
     if (phase === "playing" && distance(player.x, player.y, school.x, school.y) < 70)
       prompt = "A · Enter Kaplan School";
@@ -1053,6 +1075,30 @@
   window.addEventListener("keyup", event => {
     const direction = keyMap[event.code];
     if (direction) keys.delete(direction);
+  });
+  let pinchStart=null;
+  function gesturePoint(center) {
+    const box=canvas.getBoundingClientRect();
+    return {x:(center.x-box.left)*W/box.width,y:(center.y-box.top)*H/box.height};
+  }
+  gamePinch=PinchZoom(canvas, {
+    enabled:()=>phase==='playing'&&!CharacterStudio.isOpen&&mapOverlay.classList.contains('hidden')&&aboutOverlay.classList.contains('hidden'),
+    start(center) {
+      keys.clear();touch.clear();
+      document.querySelectorAll('.dir.pressed').forEach(b=>b.classList.remove('pressed'));
+      const p=gesturePoint(center),view=inside?roomView:{...camera,zoom:worldZoom};
+      pinchStart={inside:!!inside,zoom:view.zoom,x:view.x+p.x/view.zoom,y:view.y+p.y/view.zoom};
+    },
+    change(ratio,center) {
+      const p=gesturePoint(center),zoom=clamp(pinchStart.zoom*ratio,.75,2.5);
+      const x=pinchStart.x-p.x/zoom,y=pinchStart.y-p.y/zoom;
+      if(pinchStart.inside) {
+        roomView.zoom=zoom;roomView.x=boundView(x,W,W/zoom);roomView.y=boundView(y,H,H/zoom);
+      } else {
+        worldZoom=zoom;camera.x=boundView(x,WORLD_W,viewWidth());camera.y=boundView(y,WORLD_H,viewHeight());
+      }
+    },
+    end() { saveProgress(); }
   });
   window.addEventListener("blur", () => { keys.clear(); touch.clear(); });
   document.addEventListener("visibilitychange", () => {
@@ -1144,8 +1190,8 @@
     if(phase!=="title")generatePeople(peopleSeed);
     if (!canStand(player.x, player.y)) {
       player.x = town.start[0]; player.y = town.start[1];
-      camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
-      camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
+      camera.x = clamp(player.x - viewWidth() / 2, 0, WORLD_W - viewWidth());
+      camera.y = clamp(player.y - viewHeight() / 2, 0, WORLD_H - viewHeight());
       save();
     }
     drawOverview();
@@ -1205,9 +1251,10 @@
     if (inside) {
       inside.x *= W / previousWidth;
       inside.y *= H / previousHeight;
+      centerRoomView();
     }
-    camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
-    camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
+    camera.x = clamp(player.x - viewWidth() / 2, 0, WORLD_W - viewWidth());
+    camera.y = clamp(player.y - viewHeight() / 2, 0, WORLD_H - viewHeight());
   }));
   map.addEventListener("error", () => {
     document.querySelector(".overlay-card p").textContent =
@@ -1225,7 +1272,8 @@
   if (new URLSearchParams(location.search).has("test")) {
     window.__siteSDebug = () => ({
       x: Math.round(player.x), y: Math.round(player.y),
-      markers: foundCount(), phase,
+      markers: foundCount(), phase, worldZoom, roomZoom:roomView.zoom,
+      cameraX:camera.x,cameraY:camera.y,pinching:!!gamePinch?.active,
       hp: buddy.hp, enemyHp: battle?.hp ?? null,
       avatarLoaded: !CharacterDesign.library[characterId].original || !!characterArt[characterId]?.naturalWidth,
       character: characterId, selectedCharacter,
@@ -1253,8 +1301,8 @@
       setPlayer(x, y) {
         if (!canStand(x, y)) return false;
         player.x = x; player.y = y;
-        camera.x = clamp(x - W / 2, 0, WORLD_W - W);
-        camera.y = clamp(y - H / 2, 0, WORLD_H - H);
+        camera.x = clamp(x - viewWidth() / 2, 0, WORLD_W - viewWidth());
+        camera.y = clamp(y - viewHeight() / 2, 0, WORLD_H - viewHeight());
         return true;
       },
       worldSpriteImage: id => CharacterDesign.worldSprite(CharacterDesign.sprite(CharacterDesign.library[id])).toDataURL(),
