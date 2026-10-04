@@ -804,7 +804,7 @@
     const y = Math.round(person.y - camera.y);
     if (x < -25 || y < -45 || x > W + 25 || y > H + 25) return;
     const facing=person.facing;
-    ctx.fillStyle="#30444988";ctx.fillRect(x-9,y+1,18,4);
+    ctx.fillStyle="#394a4d88";ctx.beginPath();ctx.ellipse(x,y+3,9,3,0,0,Math.PI*2);ctx.fill();
     ctx.imageSmoothingEnabled=false;
     ctx.drawImage(CharacterDesign.worldSprite(CharacterDesign.sprite(person.design,facing,person.motion==="outbound"||person.motion==="return"?Math.floor(person.stride)%2:-1)),x-12,y-32);
   }
