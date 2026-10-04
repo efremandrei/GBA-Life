@@ -345,6 +345,12 @@
         sourceX: Number(state.interior.sourceX) || player.x,
         sourceY: Number(state.interior.sourceY) || player.y };
     }
+    if (inside) {
+      const room = HouseRooms.layout(W, H);
+      if (!HouseRooms.canStand(inside.x, inside.y, room, HouseRooms.objects(inside, room))) {
+        inside.x = room.exitX; inside.y = room.exitY - 50;
+      }
+    }
     camera.x = clamp(player.x - W / 2, 0, WORLD_W - W);
     camera.y = clamp(player.y - H / 2, 0, WORLD_H - H);
     phase = state.phase === "won" ? "won" : "playing";
@@ -468,7 +474,7 @@
     closeMenu();
   }
   function isHouseType(type) { return ["house", "house_blue", "house_teal", "high_building"].includes(type); }
-  function houseName(id) { return typeof id === "number" ? `House ${id + 1}` : `Custom house ${String(id).replace("edit-", "")}`; }
+  function houseName(id) { if (town.houses?.[id]?.address) return town.houses[id].address; return typeof id === "number" ? `House ${id + 1}` : `Custom house ${String(id).replace("edit-", "")}`; }
   function enterHouse(house) {
     const room = HouseRooms.layout(W, H);
     inside = { id: house.id, roof: house.roof, x: room.exitX,
@@ -510,6 +516,13 @@
     else if (kind === "table") say("A town map is spread across the table. Try the Map button.", 4);
     else if (kind === "plant") say("A little houseplant is thriving in the sunlight.", 4);
     else if (kind === "fridge") say("The fridge hums. Someone left a note: 'Enjoy the walk!'", 4);
+    else if (kind === "kitchen") say("A tiled kitchen counter, sink and stove. A kettle is ready for tea.", 4);
+    else if (kind === "sofa") {
+      buddy.hp = Math.min(buddy.maxHp, buddy.hp + 3); updateStatus(); save();
+      say("You take a short break on the sofa. Buddy recovers 3 HP.", 4);
+    }
+    else if (kind === "tv") say("The TV shows a travel programme about Petah Tikva's parks and light rail.", 4);
+    else if (kind === "wardrobe") say("Shirts, coats and a spare backpack. Use Design character to change your look.", 4);
     else if (kind === "radio") {
       audio = !audio;
       soundButton.textContent = `♪ ${audio ? "On" : "Off"}`;
@@ -604,7 +617,7 @@
       else if (nearest.kind === "person") say(`${nearest.data.name}: ${nearest.data.chat}`, 4.5);
       else if (nearest.kind === "scenery") interactScenery(nearest.data);
       else if (distance(player.x, player.y, town.start[0], town.start[1]) < 75)
-        say("Khen Street is your starting point. Follow the gold markers!");
+        say("Your home is Hen 14. Follow the gold markers!");
       else say("Follow the markers, or explore a house and the scenery.");
     }
   }

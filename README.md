@@ -1,12 +1,20 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.20.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.20.0/KaplanQuest-v0.20.0.apk) · [Download Petah Map Editor v1.11.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.20.0/PetahMapEditor-v1.11.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.20.0/KaplanQuest-source-v0.20.0.zip)
+[Download Kaplan Quest v0.21.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.21.0/KaplanQuest-v0.21.0.apk) · [Download Petah Map Editor v1.12.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.21.0/PetahMapEditor-v1.12.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.21.0/KaplanQuest-source-v0.21.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
 [Splash screen](docs/preview_splash_v8.png) · [Character chooser](docs/chooser_emulator_v10.png) · [55-tile editor sidebar](docs/preview_sidewalk_palette_v1.6.0.png) · [Connected sidewalks](docs/preview_sidewalks_v14.png) · [Exit Game menu](docs/preview_exit_menu_v7.png) · [House interior](docs/preview_house_v6.png) · [City sprite sheet](art/town_sprite_sheet_city.png)
 
 An offline, original pixel-art walking game for Android. Explore a stylized part of **Petah Tikva** with a street network based on real map data. Start near Khen Street, collect markers at Khen, Tzahal, and HaTsoarim streets, and reach Kaplan School. The map covers approximately **32.081–32.096° N, 34.858–34.889° E** around the school; it is a game map of this area, not the entire city or a navigation map. Buildings, parks, and characters are decorative interpretations.
+
+## Hen 14 and furnished homes
+
+New games in v0.21.0 start at Hen 14 house 59 entrance [3856,2224]. Its address map point is projected to the nearest existing grid building footprint; see data/hen14_source.md for source and placement limits. Existing saves keep their current position. The editor protects this new doorway.
+
+Each of the 388 houses now contains ten furniture objects: bed, bookshelf, table, chest, wardrobe, kitchen counter/sink/stove, sofa, TV, plant and fridge or radio. Curtains, wall clocks, framed pictures, rugs, pillows, books and crockery add detail. Mirrored layouts/colors vary by house. Furniture stays on the sides, leaving a central walking aisle. A examines objects; sofas restore 3 HP, beds fully restore Buddy and chest rewards persist. Old interior saves overlapping furniture move to the clear entrance.
+
+[Hen 14 start](docs/hen14_start_v21.png) | [Furnished home](docs/furnished_home_v21.png). `node home_interior_test.cjs` checks all 388 interiors at four sizes, object/exit reachability, new start, sofa recovery and resume.
 
 ## Continuous road surfaces
 

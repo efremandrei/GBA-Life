@@ -291,9 +291,25 @@ def main():
     if len(section)>1:npc.append([point(p) for p in section])
     section=[]
   if len(section)>1:npc.append([point(p) for p in section])
+ # Hen 14 address coordinate from the address-specific public map entry.
+ # Match its grid projection to the nearest existing building footprint;
+ # preserve all house IDs, collision and entry coordinates.
+ home_lat,home_lon=32.089088,34.87253
+ target=point(cell(home_lat,home_lon))
+ home_id=min(range(len(houses)),key=lambda i:math.dist(
+  [houses[i]['bounds'][0]+houses[i]['bounds'][2]/2,houses[i]['bounds'][1]+houses[i]['bounds'][3]/2],target))
+ home=houses[home_id];home['address']='Hen 14';home['name']='Hen 14'
+ start=(home['entry'][0]//T,home['entry'][1]//T)
+ from PIL import ImageDraw
+ hd=ImageDraw.Draw(art);hx,hy=home['entry']
+ hd.rectangle((hx-23,hy-35,hx+23,hy-21),fill='#fff1ce',outline='#344e57',width=2)
+ hd.text((hx-18,hy-33),'Hen 14',fill='#283e47')
+ home_info={'houseId':home_id,'address':'Hen 14','lat':home_lat,'lon':home_lon,
+  'entry':home['entry'],'source':'https://www.market2.co.il/lp/building/petah-tikva/%D7%97%D7%9F/14?street=%D7%97%D7%9F',
+  'placement':'nearest grid building footprint to address map point'}
  bits=bytearray((COLS*ROWS+7)//8);mask=Image.new('L',(COLS,ROWS))
  for x,y in cells:idx=y*COLS+x;bits[idx>>3]|=1<<(idx&7);mask.putpixel((x,y),255)
- town={'width':W,'height':H,'gridSize':T,'mapRevision':'orthogonal-v1','maskScale':T,'maskWidth':COLS,'walkBits':base64.b64encode(bits).decode(),'bounds':{'south':SOUTH,'west':WEST,'north':NORTH,'east':EAST},'start':point(start),'school':point(school),'markers':markers,'npcPaths':npc,'houses':houses,'scenery':scenery,'placements':placements,'vehicles':vehicles,'rail':rail,'landmarks':landmarks,'streetSigns':street_signs,'roadGrid':road_records,'osmTimestamp':roads_raw.get('osm3s',{}).get('timestamp_osm_base')}
+ town={'width':W,'height':H,'gridSize':T,'mapRevision':'orthogonal-v1','maskScale':T,'maskWidth':COLS,'walkBits':base64.b64encode(bits).decode(),'bounds':{'south':SOUTH,'west':WEST,'north':NORTH,'east':EAST},'start':point(start),'home':home_info,'school':point(school),'markers':markers,'npcPaths':npc,'houses':houses,'scenery':scenery,'placements':placements,'vehicles':vehicles,'rail':rail,'landmarks':landmarks,'streetSigns':street_signs,'roadGrid':road_records,'osmTimestamp':roads_raw.get('osm3s',{}).get('timestamp_osm_base')}
  # Grass connects walking areas without painting shortcut paths over object footprints.
  # Open grass is a separate small mask; object footprints and water stay blocked.
  grass_bits=bytearray((COLS*ROWS+7)//8)

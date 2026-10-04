@@ -214,6 +214,16 @@ const path = require('path');
   await page.keyboard.press('Escape');
   if (await page.locator('#mapOverlay').isVisible()) throw new Error('Town map did not close');
 
+  // The new home entrance faces a solid building to the north. Check walking
+  // animation on a clear road corridor rather than walking into that facade.
+  const walkingOrigin = await page.evaluate(() => {
+    for (const index of TOWN_DATA.roadCells) {
+      const x=(index%256)*32+16,y=Math.floor(index/256)*32+16;
+      if(y<180)continue;
+      if(Array.from({length:21},(_,n)=>window.__siteSTest.isWalkable(x,y-n*8)).every(Boolean) && window.__siteSTest.setPlayer(x,y))return {x,y};
+    }
+    throw new Error('No clear walking corridor');
+  });
   await page.keyboard.down('ArrowUp');
   await page.waitForFunction(() => window.__siteSDebug().walkFrame === 0);
   await page.waitForFunction(() => window.__siteSDebug().walkFrame === 1);
@@ -221,7 +231,7 @@ const path = require('path');
   await page.keyboard.up('ArrowUp');
   await page.waitForFunction(() => window.__siteSDebug().walkFrame === null);
   const moved = await page.evaluate(() => window.__siteSDebug());
-  if (moved.y >= beginning.y) throw new Error('Walking did not move player');
+  if (moved.y >= walkingOrigin.y) throw new Error('Walking did not move player');
   await page.locator('#themeButton').click();
   if (!await page.locator('html').evaluate(el => el.classList.contains('light'))) throw new Error('Light skin did not apply');
   await page.reload();
@@ -293,7 +303,7 @@ const path = require('path');
   const dana = await page.evaluate(() => window.__siteSDebug());
   await browser.close();
   if (errors.length || !won || mobileWidth.content > mobileWidth.viewport || newSeed === beginning.peopleSeed ||
-      migrated.x !== 3920 || migrated.y !== 2416 || migrated.markers !== 1 || migrated.hp !== 17 ||
+      migrated.x !== beginning.x || migrated.y !== beginning.y || migrated.markers !== 1 || migrated.hp !== 17 ||
       migrated.character !== 'andrei' || dana.character !== 'dana')
     throw new Error(JSON.stringify({ errors, won, mobileWidth, newSeed, migrated, dana }));
   console.log('PASS: splash, four-character selection, sprite save/resume, real-map game, battles, v1 migration, victory, mobile width, no JS errors.');
