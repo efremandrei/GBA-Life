@@ -5,7 +5,7 @@ const fs = require('fs');
 
 (async () => {
   const browser = await chromium.launch({
-    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true,
+    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true,args:['--allow-file-access-from-files'],
   });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
   const errors = [];
@@ -71,17 +71,18 @@ const fs = require('fs');
   await game.goto(gameUrl);
   await game.waitForFunction(() => window.__siteSDebug?.().mapLoaded);
   if (!await game.evaluate(json => window.kaplanApplyMap(json), json)) throw new Error('Game rejected editor export');
+  const firstIndex=data.tiles[0][0],firstPoint=[(firstIndex%(data.width/32))*32+16,Math.floor(firstIndex/(data.width/32))*32+16];
   const gameState = await game.evaluate(() => window.__siteSDebug());
   if (gameState.mapEdits !== painted ||
-      await game.evaluate(() => window.__siteSTest.isWalkable(1584, 1072)))
+      await game.evaluate(([x,y]) => window.__siteSTest.isWalkable(x,y),firstPoint))
     throw new Error('Game did not apply edited collision');
   await game.locator('#startButton').click();
-  await game.evaluate(() => window.__siteSTest.setPlayer(1539, 995));
+  await game.evaluate(() => window.__siteSTest.setPlayer(...window.TOWN_DATA.start));
   await game.screenshot({ path: path.join(__dirname, 'docs/game_edited_preview.png') });
   const crossingMap = JSON.stringify({ ...data,
     tiles: data.tiles.map(([index]) => [index, 'crossing']) });
   if (!await game.evaluate(json => window.kaplanApplyMap(json), crossingMap) ||
-      !await game.evaluate(() => window.__siteSTest.isWalkable(1584, 1072)))
+      !await game.evaluate(([x,y]) => window.__siteSTest.isWalkable(x,y),firstPoint))
     throw new Error('New crossing tiles did not become walkable in the game');
   await game.locator('#menuButton').click();
   await game.locator('#originalMapButton').click();

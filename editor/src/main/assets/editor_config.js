@@ -1,1 +1,1 @@
-window.EDITOR_TOWN = {"width":4096,"height":2304,"start":[1958,1195],"school":[1539,995],"markers":[[1985,1006],[1736,876],[1654,1018]]};
+window.EDITOR_TOWN = {"width":8192,"height":4608,"start":[3920,2416],"school":[3088,2032],"mapRevision":"orthogonal-v1","markers":[[3984,2032],[3504,1776],[3312,2064]]};

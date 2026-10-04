@@ -69,14 +69,14 @@
     if (map.complete && map.naturalWidth)
       ctx.drawImage(map, -view.x * view.zoom, -view.y * view.zoom,
         WIDTH * view.zoom, HEIGHT * view.zoom);
-    const firstX = Math.max(0, Math.floor(view.x / TILE));
+    const firstX = Math.max(0, Math.floor(view.x / TILE)-4);
     const lastX = Math.min(COLS - 1, Math.ceil((view.x + canvas.width / view.zoom) / TILE));
-    const firstY = Math.max(0, Math.floor(view.y / TILE));
+    const firstY = Math.max(0, Math.floor(view.y / TILE)-4);
     const lastY = Math.min(HEIGHT / TILE - 1, Math.ceil((view.y + canvas.height / view.zoom) / TILE));
     for (let y = firstY; y <= lastY; y++) for (let x = firstX; x <= lastX; x++) {
       const type = edits.get(y * COLS + x);
       if (type) MapGrid.drawTile(ctx, type, (x * TILE - view.x) * view.zoom,
-        (y * TILE - view.y) * view.zoom, TILE * view.zoom);
+        (y * TILE - view.y) * view.zoom, TILE * view.zoom,true);
     }
     ctx.strokeStyle = "#17344982";
     ctx.lineWidth = view.zoom < 0.5 ? 0.5 : 1;
@@ -92,8 +92,9 @@
     ctx.stroke();
     if (hover) {
       ctx.strokeStyle = "#ffe583"; ctx.lineWidth = 3;
+      const [fw,fh]=MapGrid.footprint(tool);
       ctx.strokeRect((hover.x * TILE - view.x) * view.zoom + 1,
-        (hover.y * TILE - view.y) * view.zoom + 1, TILE * view.zoom - 2, TILE * view.zoom - 2);
+        (hover.y * TILE - view.y) * view.zoom + 1, TILE * view.zoom * fw - 2, TILE * view.zoom * fh - 2);
     }
     const sx = (school.x - view.x) * view.zoom, sy = (school.y - view.y) * view.zoom;
     if (sx >= 0 && sy >= 0 && sx < canvas.width && sy < canvas.height) {
@@ -111,7 +112,7 @@
     for (const [index, type] of edits) {
       const x = index % COLS * TILE * scale;
       const y = Math.floor(index / COLS) * TILE * scale;
-      MapGrid.drawTile(navCtx, type, x, y, TILE * scale);
+      MapGrid.drawTile(navCtx, type, x, y, TILE * scale,true);
     }
     navCtx.strokeStyle = "#fff1a1"; navCtx.lineWidth = 3;
     navCtx.strokeRect(view.x * scale, view.y * scale,
@@ -123,7 +124,9 @@
     if (!cell) return;
     const before = edits.get(cell.index) ?? null;
     const after = tool === "erase" ? null : tool;
-    if (after && !MapGrid.walkable.has(after) && protectedTiles.has(cell.index)) {
+    const [fw,fh]=MapGrid.footprint(after);
+    const blocked=Array.from({length:fw*fh},(_,i)=>(cell.y+Math.floor(i/fw))*COLS+cell.x+i%fw);
+    if (after && !MapGrid.walkable.has(after) && (blocked.some(index=>protectedTiles.has(index)) || cell.x+fw>COLS || cell.y+fh>HEIGHT/TILE)) {
       message("Keep the start, school, and marker paths open.");
       return;
     }
@@ -309,8 +312,8 @@
   function receiveMap(json) {
     try {
       const incoming = MapGrid.parse(json, WIDTH, HEIGHT);
-      if ([...protectedTiles].some(index => incoming.has(index) &&
-          !MapGrid.walkable.has(incoming.get(index))))
+      if ([...protectedTiles].some(index => (MapGrid.covered(incoming,index%COLS,Math.floor(index/COLS),COLS) || incoming.has(index) &&
+          !MapGrid.walkable.has(incoming.get(index)))))
         throw new Error("Keep the start, school, and marker paths open.");
       const keys = new Set([...edits.keys(), ...incoming.keys()]);
       const changes = [...keys].map(index => [index, edits.get(index) ?? null,

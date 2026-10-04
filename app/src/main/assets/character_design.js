@@ -103,10 +103,20 @@
     let variants=accessoryCache.get(source);if(!variants){variants=new Map();accessoryCache.set(source,variants);}
     const key=[d.headphones,d.headphoneColor,facing].join('|');if(variants.has(key))return variants.get(key);
     const c=document.createElement('canvas');c.width=source.width;c.height=source.height;
-    const ctx=c.getContext('2d');ctx.drawImage(source,0,0);ctx.save();ctx.scale(c.width/32,c.height/48);
+    const ctx=c.getContext('2d');ctx.drawImage(source,0,0);c.worldCrop=source.worldCrop;ctx.save();ctx.scale(c.width/32,c.height/48);
     if(facing==='right'){ctx.translate(32,0);ctx.scale(-1,1);}drawHeadphones(ctx,d,facing);ctx.restore();
     variants.set(key,c);return c;
   }
+  const sizeCache=new WeakMap();
+  function worldSprite(source) {
+    if(sizeCache.has(source))return sizeCache.get(source);
+    let pixels;try{pixels=source.getContext('2d').getImageData(0,0,source.width,source.height).data;}catch(_){const c=document.createElement('canvas');c.width=24;c.height=32;const ctx=c.getContext('2d');ctx.imageSmoothingEnabled=false;if(source.worldCrop)ctx.drawImage(source,...source.worldCrop,0,0,24,32);else ctx.drawImage(source,0,0,24,32);sizeCache.set(source,c);return c;}
+    let left=source.width,top=source.height,right=0,bottom=0;
+    for(let y=0;y<source.height;y++)for(let x=0;x<source.width;x++)if(pixels[(y*source.width+x)*4+3]>32){left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x);bottom=Math.max(bottom,y);}
+    const c=document.createElement('canvas');c.width=24;c.height=32;const ctx=c.getContext('2d');ctx.imageSmoothingEnabled=false;
+    if(left<=right)ctx.drawImage(source,left,top,right-left+1,bottom-top+1,0,0,24,32);
+    sizeCache.set(source,c);return c;
+  }
   function store(id,d){ const next={...library,[id]:clean(d)};localStorage.setItem(key,JSON.stringify(next));library=next;return library[id]; }
-  window.CharacterDesign={get library(){return library;},presets,enums,colors,clean,sprite,store,withHeadphones};
+  window.CharacterDesign={get library(){return library;},presets,enums,colors,clean,sprite,store,withHeadphones,worldSprite};
 })();

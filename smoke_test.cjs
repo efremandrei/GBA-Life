@@ -171,19 +171,19 @@ const path = require('path');
       throw new Error(`${kind} gave no interaction message`);
   }
   const editedHouse = await page.evaluate(() => {
-    const width = 4096, height = 2304, tile = 32, cols = width / tile;
+    const width = window.TOWN_DATA.width, height = window.TOWN_DATA.height, tile = 32, cols = width / tile;
     const [startX, startY] = window.TOWN_DATA.start;
     for (let row = Math.floor(startY / tile) - 8; row <= Math.floor(startY / tile) + 8; row++) {
       for (let col = Math.floor(startX / tile) - 8; col <= Math.floor(startX / tile) + 8; col++) {
         const x = col * tile + 16, y = row * tile + 16;
         if (Math.hypot(x - startX, y - startY) < 65 || !window.__siteSTest.isWalkable(x, y)) continue;
-        for (const [dx, dy] of [[32, 0], [-32, 0], [0, 32], [0, -32]]) {
+        for (const [dx, dy] of [[32,128],[32,136],[40,128],[24,128]]) {
           if (!window.__siteSTest.isWalkable(x + dx, y + dy)) continue;
           const index = row * cols + col;
           const json = window.MapGrid.serialize(new Map([[index, 'high_building']]), width, height);
           if (!window.kaplanApplyMap(json)) continue;
           if (window.__siteSTest.setPlayer(x + dx, y + dy) &&
-              window.__siteSTest.nearestInteraction() === 'house') return index;
+              window.__siteSTest.nearestInteractionId() === `edit-${index}`) return index;
         }
       }
     }
@@ -293,7 +293,7 @@ const path = require('path');
   const dana = await page.evaluate(() => window.__siteSDebug());
   await browser.close();
   if (errors.length || !won || mobileWidth.content > mobileWidth.viewport || newSeed === beginning.peopleSeed ||
-      migrated.x !== 1958 || migrated.y !== 1195 || migrated.markers !== 1 || migrated.hp !== 17 ||
+      migrated.x !== 3920 || migrated.y !== 2416 || migrated.markers !== 1 || migrated.hp !== 17 ||
       migrated.character !== 'andrei' || dana.character !== 'dana')
     throw new Error(JSON.stringify({ errors, won, mobileWidth, newSeed, migrated, dana }));
   console.log('PASS: splash, four-character selection, sprite save/resume, real-map game, battles, v1 migration, victory, mobile width, no JS errors.');

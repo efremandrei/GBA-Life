@@ -177,8 +177,10 @@
           leftForward ? 0 : 4, leftForward ? 46 : 42, 19, 14);
         frameCtx.drawImage(base, 19, 44, 19, 14,
           leftForward ? 22 : 18, leftForward ? 42 : 46, 19, 14);
+        frame.worldCrop=window.AVATAR_BOUNDS[id][facing][pose+1];
         return frame;
       });
+      base.worldCrop=window.AVATAR_BOUNDS[id][facing][0];
       walkFrames[id][facing].idle=base;
     }
   }
@@ -252,7 +254,7 @@
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
         x: player.x, y: player.y, facing: player.facing,
-        character: characterId,
+        character: characterId, mapRevision:town.mapRevision, worldWidth:WORLD_W,
         markers: markers.map(marker => marker.found),
         hp: buddy.hp, snacks: buddy.snacks, phase,
         battle: battle ? { markerIndex: battle.markerIndex, hp: battle.hp } : null,
@@ -300,7 +302,7 @@
       // progress and Buddy state while relocating the player to real Hen St.
       return { ...state, x: town.start[0], y: town.start[1],
         phase: state.phase === "won" ? "won" : "playing", battle: null,
-        peopleSeed: 1878 };
+        peopleSeed: 1878, mapRevision:town.mapRevision };
     } catch (_error) { return null; }
   }
   function updateStatus() {
@@ -310,8 +312,10 @@
   function resume() {
     const state = savedGame();
     if (!state || !Number.isFinite(state.x) || !Number.isFinite(state.y)) return reset();
-    player.x = clamp(state.x, 8, WORLD_W - 8);
-    player.y = clamp(state.y, 8, WORLD_H - 8);
+    const changedMap=state.mapRevision!==town.mapRevision;
+    const factor=changedMap?2:1;
+    player.x = clamp(state.x*factor, 8, WORLD_W - 8);
+    player.y = clamp(state.y*factor, 8, WORLD_H - 8);
     if (!canStand(player.x, player.y)) {
       player.x = town.start[0]; player.y = town.start[1];
     }
@@ -325,10 +329,10 @@
     buddy.hp = clamp(Number(state.hp) || 24, 1, 24);
     buddy.snacks = clamp(Number(state.snacks) || 0, 0, 2);
     openedChests.clear();
-    if (Array.isArray(state.openedChests))
+    if (!changedMap && Array.isArray(state.openedChests))
       for (const id of state.openedChests) if (typeof id === "string" || Number.isInteger(id)) openedChests.add(String(id));
     inside = null;
-    if (state.phase === "playing" && state.interior &&
+    if (!changedMap && state.phase === "playing" && state.interior &&
         (typeof state.interior.id === "string" || Number.isInteger(state.interior.id))) {
       const room = HouseRooms.layout(W, H);
       inside = { id: state.interior.id, roof: state.interior.roof || "house",
@@ -374,6 +378,7 @@
     if (!walkBits.length || x < 3 || y < 3 || x > WORLD_W - 3 || y > WORLD_H - 3) return false;
     const tileX = Math.floor(x / MapGrid.tileSize);
     const tileY = Math.floor(y / MapGrid.tileSize);
+    if(MapGrid.covered(mapEdits,tileX,tileY,WORLD_W/MapGrid.tileSize))return false;
     const override = mapEdits.get(tileY * (WORLD_W / MapGrid.tileSize) + tileX);
     if (override) return MapGrid.walkable.has(override);
     const mx = Math.floor(x / town.maskScale);
@@ -513,7 +518,8 @@
       if (["grass", "road", "path", "plaza", "sidewalk", "crossing"].includes(type)) continue;
       const x = (index % cols + .5) * MapGrid.tileSize;
       const y = (Math.floor(index / cols) + .5) * MapGrid.tileSize;
-      if (isHouseType(type)) consider("house", x, y, { id: `edit-${index}`, roof: type }, 57);
+      const [fw,fh]=MapGrid.footprint(type);
+      if (isHouseType(type)) consider("house", x+(fw/2-.5)*MapGrid.tileSize, y+fh*MapGrid.tileSize, { id: `edit-${index}`, roof: type }, 57);
       else consider("scenery", x, y, [x, y, type], 52);
     }
     for (const person of people) consider("person", person.x, person.y, person, 52);
@@ -809,7 +815,7 @@
     const facing=Math.abs(dx)>Math.abs(dy)?(dx>0?"right":"left"):(dy>0?"down":"up");
     ctx.fillStyle="#30444988";ctx.fillRect(x-9,y+1,18,4);
     ctx.imageSmoothingEnabled=false;
-    ctx.drawImage(CharacterDesign.sprite(person.design,facing,Math.floor(person.stride)%2),x-14,y-42,28,42);
+    ctx.drawImage(CharacterDesign.worldSprite(CharacterDesign.sprite(person.design,facing,Math.floor(person.stride)%2)),x-12,y-32);
   }
 
   function drawOverview() {
@@ -872,56 +878,12 @@
   function drawPlayer(x = Math.round(player.x - camera.x),
                       y = Math.round(player.y - camera.y),
                       facing = player.facing, step = player.step) {
-    const bob = step ? Math.floor(step) % 2 : 0;
-    ctx.fillStyle = "#394a4d88";
-    ctx.beginPath();
-    ctx.ellipse(x, y + 4, 13, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    const design = CharacterDesign.library[characterId];
-    if (!design.original || !characterArt[characterId]?.naturalWidth || !walkFrames[characterId]?.[facing]?.idle) {
-      ctx.imageSmoothingEnabled=false;
-      ctx.drawImage(CharacterDesign.sprite(design,facing,step>0?Math.floor(step)%2:-1),x-19,y-58-bob,38,58);
-      return;
-    }
-    const art = characterArt[characterId];
-    if (art.complete && art.naturalWidth) {
-      const walkFrame = step > 0 ? walkFrames[characterId]?.[facing]?.[Math.floor(step) % 2] : null;
-      if (walkFrame) {
-        ctx.drawImage(CharacterDesign.withHeadphones(walkFrame,design,facing), x - 21, y - 58 - bob);
-        return;
-      }
-      const [sx, sy, sw, sh] = characters[characterId].views[facing];
-      ctx.drawImage(CharacterDesign.withHeadphones(walkFrames[characterId][facing].idle,design,facing),x-19,y-58-bob,38,58);
-      return;
-    }
-    // Matching code-drawn fallback in case the separate sprite image is missing.
-    const stride = Math.floor(step) % 2;
-    const pixels = [
-      [3, 13 + stride, 3, 2, "#263247"], [7, 14 - stride, 3, 2, "#263247"],
-      [3, 8, 7, 5, "#263247"], [4, 8, 5, 4, "#3878b3"],
-      [2, 8, 2, 4, "#263247"],
-      [9, 8, 2, 4, "#263247"], [2, 9, 1, 2, "#f3bd89"],
-      [10, 9, 1, 2, "#f3bd89"], [3, 4, 7, 5, "#263247"],
-    ];
-    if (facing === "up") {
-      pixels.push([4, 3, 5, 5, "#4b3b40"], [4, 8, 5, 4, "#c73b41"],
-        [5, 9, 3, 2, "#ef5a57"]);
-    } else {
-      pixels.push([4, 5, 5, 3, "#f3bd89"]);
-      if (facing === "down") {
-        pixels.push([5, 6, 1, 1, "#263247"], [7, 6, 1, 1, "#263247"],
-          [4, 7, 5, 2, "#4b3b40"], [5, 7, 3, 1, "#7c5845"]);
-      } else {
-        pixels.push([facing === "left" ? 4 : 8, 6, 1, 1, "#263247"],
-          [4, 7, 5, 2, "#4b3b40"],
-          [facing === "left" ? 8 : 3, 8, 2, 4, "#c73b41"]);
-      }
-    }
-    pixels.push([3, 2, 7, 3, "#263247"], [4, 2, 5, 3, "#4b3b40"]);
-    for (const [px, py, pw, ph, color] of pixels) {
-      ctx.fillStyle = color;
-      ctx.fillRect(x - 18 + px * 3, y - 45 - bob + py * 3, pw * 3, ph * 3);
-    }
+    const design=CharacterDesign.library[characterId],pose=step>0?Math.floor(step)%2:-1;
+    ctx.fillStyle="#394a4d88";ctx.beginPath();ctx.ellipse(x,y+3,9,3,0,0,Math.PI*2);ctx.fill();
+    let source=CharacterDesign.sprite(design,facing,pose);
+    if(design.original && walkFrames[characterId]?.[facing])
+      source=CharacterDesign.withHeadphones(pose<0?walkFrames[characterId][facing].idle:walkFrames[characterId][facing][pose],design,facing);
+    ctx.imageSmoothingEnabled=false;ctx.drawImage(CharacterDesign.worldSprite(source),x-12,y-32);
   }
   function drawHud(label, prompt) {
     const leftWidth = Math.min(211, Math.floor(W * .56));
@@ -972,15 +934,15 @@
       ctx.fillRect(0, 0, W, H);
     }
     const cols = WORLD_W / MapGrid.tileSize;
-    const firstX = Math.max(0, Math.floor(camera.x / MapGrid.tileSize));
+    const firstX = Math.max(0, Math.floor(camera.x / MapGrid.tileSize)-4);
     const lastX = Math.min(cols - 1, Math.ceil((camera.x + W) / MapGrid.tileSize));
-    const firstY = Math.max(0, Math.floor(camera.y / MapGrid.tileSize));
+    const firstY = Math.max(0, Math.floor(camera.y / MapGrid.tileSize)-4);
     const lastY = Math.min(WORLD_H / MapGrid.tileSize - 1,
       Math.ceil((camera.y + H) / MapGrid.tileSize));
     for (let tileY = firstY; tileY <= lastY; tileY++) for (let tileX = firstX; tileX <= lastX; tileX++) {
       const type = mapEdits.get(tileY * cols + tileX);
       if (type) MapGrid.drawTile(ctx, type,
-        tileX * MapGrid.tileSize - camera.x, tileY * MapGrid.tileSize - camera.y);
+        tileX * MapGrid.tileSize - camera.x, tileY * MapGrid.tileSize - camera.y,MapGrid.tileSize,true);
     }
     // A subtle prompt remains over the destination door.
     if (foundCount() === 3) {
@@ -1162,6 +1124,10 @@
     applyTheme(theme);
     try { localStorage.setItem("kaplan-quest-theme", theme); } catch (_error) { /* Keep current session theme. */ }
   });
+  if(mapEdits.size && ![town.start,town.school,...town.markers.map(m=>m.point)].every(([x,y])=>canStand(x,y))) {
+    try{localStorage.setItem(MAP_KEY+"-pre-grid-backup",localStorage.getItem(MAP_KEY)||"");localStorage.removeItem(MAP_KEY);}catch(_){}
+    mapEdits=new Map();setMapStatus("Previous map edits kept in local backup; re-import a revised map with open quest paths.");
+  }
   const previousGame = savedGame();
   if (previousGame) {
     continueButton.classList.remove("hidden");
@@ -1224,6 +1190,7 @@
       mapLoaded: map.complete && map.naturalWidth > 0,
       maskLoaded: !!walkBits.length, peopleCount: people.length, peopleSeed,
       mapOpen: !mapOverlay.classList.contains("hidden"),
+      characterSize: {width:24,height:32}, npcSize: {width:24,height:32},
       mapEdits: mapEdits.size, interior: inside?.id ?? null,
       houseCount: town.houses?.length ?? 0, sceneryCount: town.scenery?.length ?? 0,
       snacks: buddy.snacks, roomX: inside?.x ?? null, roomY: inside?.y ?? null,
@@ -1240,6 +1207,7 @@
         camera.y = clamp(y - H / 2, 0, WORLD_H - H);
         return true;
       },
+      worldSpriteImage: id => CharacterDesign.worldSprite(CharacterDesign.sprite(CharacterDesign.library[id])).toDataURL(),
       peopleDesigns: () => people.map(person=>person.design),
       nearestPeople: () => people.filter(person => distance(person.x, person.y, player.x, player.y) < 320).length,
       firstPerson: () => people.length ? { x: people[0].x, y: people[0].y,
@@ -1256,6 +1224,7 @@
       roomObjects: () => inside ? HouseRooms.objects(inside, HouseRooms.layout(W, H)) : [],
       setRoomPlayer(x, y) { if (!inside) return false; inside.x = x; inside.y = y; return true; },
       setBuddy(hp, snacks) { buddy.hp = hp; buddy.snacks = snacks; updateStatus(); },
+      nearestInteractionId: () => nearestWorldThing().data?.id,
       nearestInteraction: () => nearestWorldThing().kind,
       nearestInteractionType: () => {
         const nearest = nearestWorldThing();
