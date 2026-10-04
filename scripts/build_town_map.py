@@ -5,6 +5,7 @@ from pathlib import Path
 import json, base64, random, shutil, math
 from collections import deque
 from PIL import Image, ImageDraw, ImageFont
+from grid_surfaces import surface, connection_mask
 ROOT=Path(__file__).resolve().parents[1]
 ASSETS=ROOT/'app/src/main/assets'
 W,H,T=8192,4608,32
@@ -86,7 +87,12 @@ def main():
    for y in range(top,bottom+1):zones[x,y]=kind
  for y in range(ROWS):
   for x in range(COLS):art.paste(terrain['water' if zones.get((x,y))=='water' and (x,y) not in cells else 'grass'],(x*T,y*T))
- def paint(c,kind):art.paste(terrain[kind],(c[0]*T,c[1]*T))
+ def paint(c,kind):
+  if kind=='road':im=surface(connection_mask(c,cells,{'road'}))
+  elif kind=='access':im=surface(connection_mask(c,cells,{'access','path','road','sidewalk','plaza'})| (1 if c in access_doors else 0),True)
+  else:im=terrain[kind]
+  art.paste(im,(c[0]*T,c[1]*T))
+ access_doors=set()
  for c,kind in cells.items():paint(c,kind)
  used=set(cells);houses=[];scenery=[];placements=[]
  def place(kind,x,y,w,h,house=False):
@@ -96,11 +102,18 @@ def main():
   if math.dist(near,door)>5:return False
   approach=line(door,near)
   if any(c in used and c not in cells for c in approach):return False
+  access_doors.add(door)
   for c in approach:
-   cells.setdefault(c,'path');paint(c,cells[c]);used.add(c)
-  im=sprite(kind,w*T,h*T);art.paste(im,(x*T,y*T),im);used.update(footprint)
+   cells.setdefault(c,'access');used.add(c)
+  for c in approach:paint(c,cells[c])
+  im=sprite(kind,w*T,h*T)
+  if house:
+   # Continue the same 24px paving into the path already illustrated below the door.
+   im.paste(terrain['grass'].crop((0,0,32,16)),(w*T//2-16,h*T-16))
+   paving=surface(5,True);im.paste(paving.crop((4,0,28,16)),(w*T//2-12,h*T-16))
+  art.paste(im,(x*T,y*T),im);used.update(footprint)
   entry=point(door);placements.append({'kind':kind,'rect':[x*T,y*T,w*T,h*T],'entry':entry})
-  if house:houses.append({'entry':entry,'door':entry,'roof':kind,'bounds':[x*T,y*T,w*T,h*T]})
+  if house:houses.append({'entry':entry,'door':entry,'roof':kind,'bounds':[x*T,y*T,w*T,h*T],'accessWidth':24,'approach':[point(c) for c in approach]})
   else:scenery.append([*entry,kind])
   return True
  # Campus retains its mapped location; place the school immediately above its entry.
@@ -175,9 +188,13 @@ def main():
    for n in line(c,near):cells.setdefault(n,'path');paint(n,cells[n]);idx=n[1]*COLS+n[0];bits[idx>>3]|=1<<(idx&7);mask.putpixel(n,255)
    reached=component(start)
  town['walkBits']=base64.b64encode(bits).decode()
+ town['roadCells']=[y*COLS+x for (x,y),kind in cells.items() if kind=='road']
+ town['accessCells']=[y*COLS+x for (x,y),kind in cells.items() if kind=='access']
+ for c,kind in cells.items():
+  if kind=='access':paint(c,kind)
  art.save(ASSETS/'petah_tikva_town_map.png',optimize=True);mask.save(ASSETS/'walkmask.png',optimize=True)
  (ASSETS/'town_data.js').write_text('window.TOWN_DATA = '+json.dumps(town,separators=(',',':'))+';\n',encoding='utf-8')
  editor=ROOT/'editor/src/main/assets';shutil.copyfile(ASSETS/'petah_tikva_town_map.png',editor/'petah_tikva_town_map.png');shutil.copyfile(ASSETS/'map_grid.js',editor/'map_grid.js')
- (editor/'editor_config.js').write_text('window.EDITOR_TOWN = '+json.dumps({k:town[k] for k in ['width','height','start','school','mapRevision']}|{'markers':[m['point'] for m in markers]},separators=(',',':'))+';\n',encoding='utf-8')
+ (editor/'editor_config.js').write_text('window.EDITOR_TOWN = '+json.dumps({k:town[k] for k in ['width','height','start','school','mapRevision','roadCells','accessCells']}|{'markers':[m['point'] for m in markers]},separators=(',',':'))+';\n',encoding='utf-8')
  print(f'Grid: {len(roads)} mapped roads; {len(houses)} houses; {len(scenery)} props; {len(npc)} NPC routes; start {town["start"]}; school {town["school"]}')
 if __name__=='__main__':main()

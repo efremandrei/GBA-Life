@@ -9,8 +9,10 @@
     "tram_stop", "car", "bike", "tram", "playground_slide", "playground_swings",
     "gas_station", "shopping_mall", "hospital", "city_hall", "traffic_light", "bench",
   ];
+  atlasNames.push(...Array.from({length:16},(_,i)=>`road_${i}`),...Array.from({length:16},(_,i)=>`access_${i}`));
+  const roadMasks={road_vertical:5,road_horizontal:10,road_corner_ne:3,road_corner_es:6,road_corner_sw:12,road_corner_wn:9,road_t_n:11,road_t_e:7,road_t_s:14,road_t_w:13,road_cross:15};
   const types = [
-    "grass", "road", "path", "plaza", "sidewalk", "crossing", "water",
+    "grass", "road", ...Object.keys(roadMasks), "access", "path", "plaza", "sidewalk", "crossing", "water",
     "tree", "shrub", "flowers", "fence",
     "house", "house_blue", "house_teal", "high_building", "school", "market",
     "shopping_mall", "hospital", "city_hall", "gas_station",
@@ -20,6 +22,22 @@
   const artIndex = Object.fromEntries(atlasNames.map((name, index) => [name, index]));
   const walkable = new Set(["road", "path", "plaza", "sidewalk", "crossing"]);
   const terrain = new Set(["grass", "road", "path", "water", "plaza", "sidewalk", "crossing"]);
+  for(const type of ['access',...Object.keys(roadMasks)]){walkable.add(type);terrain.add(type);}
+  for(const [name,mask]of Object.entries(roadMasks))artIndex[name]=32+mask;
+  artIndex.road=37;artIndex.access=53;
+  const isRoad=type=>type==='road'||Object.hasOwn(roadMasks,type);
+  function connectedType(edits,index,cols,baseRoads,baseAccess){
+    if(!edits.has(index)&&(!baseRoads?.has(index)||![index-cols,index+1,index+cols,index-1].some(i=>edits.has(i))))return null;
+    const type=edits.get(index)||(baseRoads?.has(index)?'road':baseAccess?.has(index)?'access':null);
+    if(type!=='road'&&type!=='access')return type;
+    const neighbour=i=>edits.get(i)||(baseRoads?.has(i)?'road':baseAccess?.has(i)?'access':null);
+    let mask=0;
+    for(const [bit,i,valid]of [[1,index-cols,index>=cols],[2,index+1,index%cols<cols-1],[4,index+cols,true],[8,index-1,index%cols>0]]){
+      const next=valid?neighbour(i):null;
+      if(type==='road'?isRoad(next):walkable.has(next))mask|=bit;
+    }
+    return `${type}_${mask}`;
+  }
   const footprints={house:[3,3],house_blue:[3,3],house_teal:[3,3],high_building:[3,4],school:[5,4],hospital:[4,4],city_hall:[4,4],shopping_mall:[5,4],gas_station:[4,3],tree:[2,2],car:[2,2],tram:[2,4],bus_stop:[2,2],tram_stop:[2,2],playground_slide:[2,2],playground_swings:[3,2],fountain:[2,2],bench:[2,1],lamp:[1,2],traffic_light:[1,2]};
   const footprint=type=>footprints[type]||[1,1];
   function covered(edits,col,row,cols) {
@@ -78,14 +96,19 @@
       return;
     }
     ctx.imageSmoothingEnabled = false;
-    if (!terrain.has(type))
+    if (!terrain.has(type)&&!/^road_\d+$|^access_\d+$/.test(type))
       ctx.drawImage(art, 0, 0, artSize, artSize, x, y, size*fw, size*fh);
     ctx.drawImage(art, (index % 4) * artSize, Math.floor(index / 4) * artSize,
       artSize, artSize, x, y, size*fw, size*fh);
+    if(['house','house_blue','house_teal','high_building'].includes(type)){
+      const scale=size*fw/96,bottom=y+size*fh;
+      ctx.drawImage(art,0,0,96,48,x+size*fw/2-16*scale,bottom-16*scale,32*scale,16*scale);
+      ctx.drawImage(art,(artIndex.access%4)*96+12,Math.floor(artIndex.access/4)*96,72,48,x+size*fw/2-12*scale,bottom-16*scale,24*scale,16*scale);
+    }
   }
   function whenArtReady(callback) {
     if (art.complete && art.naturalWidth) callback();
     else art.addEventListener("load", callback, { once: true });
   }
-  window.MapGrid = { tileSize, types, walkable, parse, serialize, drawTile, whenArtReady, footprint, covered };
+  window.MapGrid = { tileSize, types, walkable, parse, serialize, drawTile, whenArtReady, footprint, covered, connectedType, terrain, isRoad };
 })();

@@ -8,3 +8,5 @@ keystore.properties
 *.zip
 /preview_*.png
 /emulator_*.png
+
+__pycache__/

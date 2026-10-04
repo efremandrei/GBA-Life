@@ -86,7 +86,7 @@ const path = require('path');
     }, {}),
     tileCount: window.MapGrid.types.length,
   }));
-  if (cityCounts.tileCount !== 32 || cityCounts.houses < 20 ||
+  if (cityCounts.tileCount !== 44 || cityCounts.houses < 20 ||
       ['hospital', 'bus_stop', 'tram_stop', 'tram', 'car', 'bike', 'playground_slide',
         'playground_swings', 'traffic_light', 'bench'].some(kind => !cityCounts.kinds[kind]))
     throw new Error(`New city assets are missing: ${JSON.stringify(cityCounts)}`);
@@ -297,4 +297,4 @@ const path = require('path');
       migrated.character !== 'andrei' || dana.character !== 'dana')
     throw new Error(JSON.stringify({ errors, won, mobileWidth, newSeed, migrated, dana }));
   console.log('PASS: splash, four-character selection, sprite save/resume, real-map game, battles, v1 migration, victory, mobile width, no JS errors.');
-})().catch(error => { console.error(error); process.exitCode = 1; });
+})().catch(error => { console.error(error); process.exit(1); });
