@@ -1,12 +1,16 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.22.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.22.0/KaplanQuest-v0.22.0.apk) · [Download Petah Map Editor v1.13.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.22.0/PetahMapEditor-v1.13.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.22.0/KaplanQuest-source-v0.22.0.zip)
+[Download Kaplan Quest v0.23.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.23.0/KaplanQuest-v0.23.0.apk) · [Download Petah Map Editor v1.13.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.22.0/PetahMapEditor-v1.13.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.23.0/KaplanQuest-source-v0.23.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
 [Splash screen](docs/preview_splash_v8.png) · [Character chooser](docs/chooser_emulator_v10.png) · [55-tile editor sidebar](docs/preview_sidewalk_palette_v1.6.0.png) · [Connected sidewalks](docs/preview_sidewalks_v14.png) · [Exit Game menu](docs/preview_exit_menu_v7.png) · [House interior](docs/preview_house_v6.png) · [City sprite sheet](art/town_sprite_sheet_city.png)
 
 An offline, original pixel-art walking game for Android. Explore a stylized part of **Petah Tikva** with a street network based on real map data. Start near Khen Street, collect markers at Khen, Tzahal, and HaTsoarim streets, and reach Kaplan School. The map covers approximately **32.081–32.096° N, 34.858–34.889° E** around the school; it is a game map of this area, not the entire city or a navigation map. Buildings, parks, and characters are decorative interpretations.
+
+## Touch navigation
+
+Game v0.23.0: touch and hold above, below, left or right of the visible character to walk in that direction. Drag to steer; release to stop. A small area over the character stays neutral. Works outdoors and indoors at any zoom, with normal collision and grass speed. A second finger stops walking and starts pinch zoom; lifting that finger does not restart walking until a new touch. Direction buttons and keyboard controls remain available. `node screen_navigation_test.cjs` verifies directions, drag, release/cancel, zoom, interiors, modal pause and pinch takeover.
 
 ## Pinch to zoom
 

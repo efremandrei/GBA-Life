@@ -61,6 +61,8 @@
   const school = { x: town.school[0], y: town.school[1] };
   const player = { x: town.start[0], y: town.start[1], facing: "down", step: 0 };
   let worldZoom=1, gamePinch=null;
+  let screenPointer=null, screenDirection=null;
+  const stopScreenWalk=()=>{screenPointer=null;screenDirection=null;};
   const roomView={x:0,y:0,zoom:1};
   const viewWidth=()=>W/worldZoom,viewHeight=()=>H/worldZoom;
   function boundView(value,limit,size) { return size>limit?(limit-size)/2:clamp(value,0,limit-size); }
@@ -488,6 +490,7 @@
   function isHouseType(type) { return ["house", "house_blue", "house_teal", "high_building"].includes(type); }
   function houseName(id) { if (town.houses?.[id]?.address) return town.houses[id].address; return typeof id === "number" ? `House ${id + 1}` : `Custom house ${String(id).replace("edit-", "")}`; }
   function enterHouse(house) {
+    stopScreenWalk();
     const room = HouseRooms.layout(W, H);
     inside = { id: house.id, roof: house.roof, x: room.exitX,
       y: room.exitY - 50, facing: "up", step: 0,
@@ -498,6 +501,7 @@
     save();
   }
   function leaveHouse() {
+    stopScreenWalk();
     if (!inside) return;
     player.x = canStand(inside.sourceX, inside.sourceY) ? inside.sourceX : town.start[0];
     player.y = canStand(inside.sourceX, inside.sourceY) ? inside.sourceY : town.start[1];
@@ -739,13 +743,14 @@
   }
   function update(dt, time, elapsed = dt) {
     if (phase === "playing" || phase === "battle") cityTime += elapsed;
-    if (phase !== "playing") return;
+    if (phase !== "playing") { stopScreenWalk(); return; }
+    updateScreenWalk();
     if (gamePinch?.active) { player.step=0; if(inside)inside.step=0; return; }
     if (CharacterStudio.isOpen || !mapOverlay.classList.contains("hidden") || !aboutOverlay.classList.contains("hidden")) return;
     if (inside) {
       const room = HouseRooms.layout(W, H);
       const items = HouseRooms.objects(inside, room);
-      const down = name => keys.has(name) || touch.has(name);
+      const down = name => keys.has(name) || touch.has(name) || screenDirection===name;
       let dx = Number(down("right")) - Number(down("left"));
       let dy = Number(down("down")) - Number(down("up"));
       if (dx || dy) {
@@ -771,7 +776,7 @@
       return;
     }
     updatePeople(dt);
-    const down = name => keys.has(name) || touch.has(name);
+    const down = name => keys.has(name) || touch.has(name) || screenDirection===name;
     let dx = Number(down("right")) - Number(down("left"));
     let dy = Number(down("down")) - Number(down("up"));
     if (dx || dy) {
@@ -1084,6 +1089,7 @@
   gamePinch=PinchZoom(canvas, {
     enabled:()=>phase==='playing'&&!CharacterStudio.isOpen&&mapOverlay.classList.contains('hidden')&&aboutOverlay.classList.contains('hidden'),
     start(center) {
+      stopScreenWalk();
       keys.clear();touch.clear();
       document.querySelectorAll('.dir.pressed').forEach(b=>b.classList.remove('pressed'));
       const p=gesturePoint(center),view=inside?roomView:{...camera,zoom:worldZoom};
@@ -1100,9 +1106,39 @@
     },
     end() { saveProgress(); }
   });
-  window.addEventListener("blur", () => { keys.clear(); touch.clear(); });
+  function screenWalkEnabled() {
+    return phase==='playing'&&!gamePinch?.active&&!CharacterStudio.isOpen&&
+      mapOverlay.classList.contains('hidden')&&aboutOverlay.classList.contains('hidden')&&
+      !gameMenu.classList.contains('open');
+  }
+  function updateScreenWalk() {
+    if(!screenWalkEnabled()) { stopScreenWalk();return; }
+    screenDirection=null;
+    if(!screenPointer || performance.now()-screenPointer.started<100)return;
+    const box=canvas.getBoundingClientRect();
+    // Compare in screen pixels to the visible sprite center, including zoom.
+    const x=inside?(inside.x-roomView.x)*roomView.zoom:(player.x-camera.x)*worldZoom;
+    const y=inside?(inside.y-14-roomView.y)*roomView.zoom:(player.y-14-camera.y)*worldZoom;
+    const dx=screenPointer.x-(box.left+x/W*box.width);
+    const dy=screenPointer.y-(box.top+y/H*box.height);
+    if(Math.hypot(dx,dy)<18)return;
+    screenDirection=Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up');
+  }
+  canvas.addEventListener('pointerdown',event=>{
+    if(!screenWalkEnabled()||screenPointer||event.button>0)return;
+    event.preventDefault();canvas.setPointerCapture(event.pointerId);
+    screenPointer={id:event.pointerId,x:event.clientX,y:event.clientY,started:performance.now()};
+  });
+  canvas.addEventListener('pointermove',event=>{
+    if(screenPointer?.id!==event.pointerId)return;
+    screenPointer.x=event.clientX;screenPointer.y=event.clientY;
+  });
+  for(const name of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(name,event=>{
+    if(screenPointer?.id===event.pointerId)stopScreenWalk();
+  });
+  window.addEventListener("blur", () => { keys.clear(); touch.clear();stopScreenWalk(); });
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) saveProgress();
+    if (document.hidden) { stopScreenWalk(); keys.clear();touch.clear();saveProgress(); }
   });
   window.addEventListener("pagehide", saveProgress);
   for (const button of document.querySelectorAll(".dir")) {
@@ -1274,6 +1310,7 @@
       x: Math.round(player.x), y: Math.round(player.y),
       markers: foundCount(), phase, worldZoom, roomZoom:roomView.zoom,
       cameraX:camera.x,cameraY:camera.y,pinching:!!gamePinch?.active,
+      screenDirection,roomViewX:roomView.x,roomViewY:roomView.y,
       hp: buddy.hp, enemyHp: battle?.hp ?? null,
       avatarLoaded: !CharacterDesign.library[characterId].original || !!characterArt[characterId]?.naturalWidth,
       character: characterId, selectedCharacter,
