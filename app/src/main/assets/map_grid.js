@@ -31,15 +31,24 @@
   const isRoad=type=>type==='road'||Object.hasOwn(roadMasks,type);
   const isSidewalk=type=>type==='sidewalk'||Object.hasOwn(sidewalkMasks,type);
   function connectedType(edits,index,cols,baseRoads,baseAccess,baseSidewalks,basePaving){
-    if(!edits.has(index)&&(!(baseRoads?.has(index)||baseSidewalks?.has(index))||![index-cols,index+1,index+cols,index-1].some(i=>edits.has(i))))return null;
+    if(!edits.has(index)&&(!(baseRoads?.has(index)||baseSidewalks?.has(index))||![index-cols,index+1,index+cols,index-1,index-cols+1,index+cols+1,index+cols-1,index-cols-1].some(i=>edits.has(i))))return null;
     const type=edits.get(index)||(baseRoads?.has(index)?'road':baseAccess?.has(index)?'access':baseSidewalks?.has(index)?'sidewalk':null);
-    if(type!=='road'&&type!=='access'&&type!=='sidewalk')return type;
+    if(type!=='road'&&type!=='access'&&type!=='sidewalk'&&!Object.hasOwn(roadMasks,type))return type;
     const neighbour=i=>edits.get(i)||(baseRoads?.has(i)?'road':baseAccess?.has(i)?'access':baseSidewalks?.has(i)?'sidewalk':basePaving?.has(i)?'path':null);
-    let mask=0;
+    let mask=roadMasks[type] ?? 0;
     for(const [bit,i,valid]of [[1,index-cols,index>=cols],[2,index+1,index%cols<cols-1],[4,index+cols,true],[8,index-1,index%cols>0]]){
       const next=valid?neighbour(i):null;
+      if(Object.hasOwn(roadMasks,type))continue;
       if(type==='road'?isRoad(next):type==='sidewalk'?(isSidewalk(next)||['access','path','plaza','crossing'].includes(next)):(next!=='grass'&&walkable.has(next)))mask|=bit;
     }
+    if(isRoad(type)) {
+      for(const [bit,i,valid]of [[16,index-cols+1,index>=cols&&index%cols<cols-1],
+        [32,index+cols+1,index%cols<cols-1],[64,index+cols-1,index%cols>0],
+        [128,index-cols-1,index>=cols&&index%cols>0]]) {
+        if(valid&&isRoad(neighbour(i)))mask|=bit;
+      }
+    }
+    if(Object.hasOwn(roadMasks,type))return mask>15 ? `road_${mask}` : type;
     return `${type}_${mask}`;
   }
   const footprints={house:[3,3],house_blue:[3,3],house_teal:[3,3],high_building:[3,4],school:[5,4],hospital:[4,4],city_hall:[4,4],shopping_mall:[5,4],gas_station:[4,3],tree:[2,2],car:[2,2],tram:[2,4],bus_stop:[2,2],tram_stop:[2,2],playground_slide:[2,2],playground_swings:[3,2],fountain:[2,2],bench:[2,1],lamp:[1,2],traffic_light:[1,2]};
@@ -53,6 +62,8 @@
   }
   const art = new Image();
   art.src = "tile_atlas.png";
+  const roadArt = new Image();
+  roadArt.src = "road_atlas.png";
 
   function parse(input, width, height) {
     let data = typeof input === "string" ? JSON.parse(input) : input;
@@ -91,6 +102,15 @@
   }
   function drawTile(ctx, type, x, y, size = tileSize, stamp = false) {
     const [fw,fh]=stamp?footprint(type):[1,1];
+    const roadMask = type === 'road' ? 5 : roadMasks[type] ??
+      (/^road_\d+$/.test(type) ? Number(type.slice(5)) : null);
+    if(roadMask !== null && roadMask >= 0 && roadMask < 256) {
+      ctx.imageSmoothingEnabled = false;
+      if(roadArt.complete && roadArt.naturalWidth)
+        ctx.drawImage(roadArt,(roadMask%16)*32,Math.floor(roadMask/16)*32,32,32,x,y,size,size);
+      else {ctx.fillStyle='#b9c1be';ctx.fillRect(x,y,size,size);}
+      return;
+    }
     const index = artIndex[type];
     if (index === undefined) return;
     if (!art.complete || !art.naturalWidth) {
@@ -111,8 +131,15 @@
     }
   }
   function whenArtReady(callback) {
-    if (art.complete && art.naturalWidth) callback();
-    else art.addEventListener("load", callback, { once: true });
+    let called = false;
+    function ready() {
+      if(!called && art.complete && art.naturalWidth && roadArt.complete && roadArt.naturalWidth) {
+        called = true; callback();
+      }
+    }
+    art.addEventListener("load", ready, { once:true });
+    roadArt.addEventListener("load", ready, { once:true });
+    ready();
   }
   window.MapGrid = { tileSize, types, walkable, parse, serialize, drawTile, whenArtReady, footprint, covered, connectedType, terrain, isRoad };
 })();

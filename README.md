@@ -1,12 +1,18 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.19.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.19.0/KaplanQuest-v0.19.0.apk) · [Download Petah Map Editor v1.10.0](https://github.com/efremandrei/GBA-Life/releases/download/editor-v1.10.0/PetahMapEditor-v1.10.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/editor-v1.10.0/GBA-Life-source-editor-v1.10.0.zip)
+[Download Kaplan Quest v0.20.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.20.0/KaplanQuest-v0.20.0.apk) · [Download Petah Map Editor v1.11.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.20.0/PetahMapEditor-v1.11.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.20.0/KaplanQuest-source-v0.20.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
 [Splash screen](docs/preview_splash_v8.png) · [Character chooser](docs/chooser_emulator_v10.png) · [55-tile editor sidebar](docs/preview_sidewalk_palette_v1.6.0.png) · [Connected sidewalks](docs/preview_sidewalks_v14.png) · [Exit Game menu](docs/preview_exit_menu_v7.png) · [House interior](docs/preview_house_v6.png) · [City sprite sheet](art/town_sprite_sheet_city.png)
 
 An offline, original pixel-art walking game for Android. Explore a stylized part of **Petah Tikva** with a street network based on real map data. Start near Khen Street, collect markers at Khen, Tzahal, and HaTsoarim streets, and reach Kaplan School. The map covers approximately **32.081–32.096° N, 34.858–34.889° E** around the school; it is a game map of this area, not the entire city or a navigation map. Buildings, parks, and characters are decorative interpretations.
+
+## Continuous road surfaces
+
+Game v0.20.0 / editor v1.11.0 remove the repeated beige squares inside wide roads. The shared road renderer and map builder now account for diagonal neighbors, filling the inner tile corners where road cells meet. Outer curbs and single-cell road corners remain intact. Automatic and explicit painted roads adapt to neighboring road cells; editing a diagonal neighbor redraws the affected base tile. Saved map JSON and world geometry remain unchanged.
+
+`python scripts/check_wide_roads.py` verifies uninterrupted asphalt inside two- and three-cell-wide roads in both orientations. `node wide_road_test.cjs` verifies both app atlases, diagonal edit updates and compatible map exports.
 
 ## Expandable map editor
 

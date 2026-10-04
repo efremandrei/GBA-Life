@@ -5,7 +5,7 @@ from pathlib import Path
 import json, base64, random, shutil, math
 from collections import deque
 from PIL import Image
-from grid_surfaces import surface, connection_mask
+from grid_surfaces import surface, connection_mask, road_connection_mask
 from city_features import rail_network, paint_rails, signs
 ROOT=Path(__file__).resolve().parents[1]
 ASSETS=ROOT/'app/src/main/assets'
@@ -89,7 +89,7 @@ def main():
  for y in range(ROWS):
   for x in range(COLS):art.paste(terrain['water' if zones.get((x,y))=='water' and (x,y) not in cells else 'grass'],(x*T,y*T))
  def paint(c,kind):
-  if kind=='road':im=surface(connection_mask(c,cells,{'road'}))
+  if kind=='road':im=surface(road_connection_mask(c,cells))
   elif kind=='sidewalk':im=surface(connection_mask(c,cells,{'sidewalk','access','path','plaza','crossing'}),sidewalk=True)
   elif kind=='access':im=surface(connection_mask(c,cells,{'access','path','road','sidewalk','plaza'})| (1 if c in access_doors else 0),True)
   else:im=terrain[kind]

@@ -94,7 +94,12 @@ def main() -> None:
     editor_assets = ROOT / "editor" / "src" / "main" / "assets"
     atlas.save(app_assets / "tile_atlas.png", optimize=True)
     shutil.copyfile(app_assets / "tile_atlas.png", editor_assets / "tile_atlas.png")
-    print(f"Prepared 80 art tiles and both app atlases.")
+    road_atlas=Image.new("RGBA",(512,512))
+    for mask in range(256):
+        road_atlas.paste(surface(mask),((mask%16)*32,(mask//16)*32))
+    road_atlas.save(app_assets/"road_atlas.png",optimize=True)
+    shutil.copyfile(app_assets/"road_atlas.png",editor_assets/"road_atlas.png")
+    print("Prepared 80 shared tiles plus 256 seamless road variants for both apps.")
 
 
 if __name__ == "__main__":

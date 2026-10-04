@@ -2,13 +2,20 @@
 from PIL import Image, ImageDraw
 from functools import lru_cache
 
-@lru_cache(maxsize=48)
+@lru_cache(maxsize=288)
 def surface(mask, access=False, sidewalk=False):
     image=Image.new('RGBA',(32,32),'#91dc78' if access or sidewalk else '#d5c8ae')
     fill=Image.new('1',(32,32));d=ImageDraw.Draw(fill)
     d.rectangle((4,4,27,27),fill=1)
     for bit,rect in [(1,(4,0,27,4)),(2,(27,4,31,27)),(4,(4,27,27,31)),(8,(0,4,4,27))]:
         if mask&bit:d.rectangle(rect,fill=1)
+    # Fill an inner corner only when both bordering edges AND the diagonal
+    # belong to the road. Four tiles meeting inside a wide road must not expose
+    # their beige outside corners as a repeated island.
+    if not access and not sidewalk:
+        for required,rect in [(1|2|16,(28,0,31,3)),(2|4|32,(28,28,31,31)),
+                              (4|8|64,(0,28,3,31)),(8|1|128,(0,0,3,3))]:
+            if mask & required == required:d.rectangle(rect,fill=1)
     pixels=image.load()
     for y in range(32):
         for x in range(32):
@@ -25,3 +32,10 @@ def surface(mask, access=False, sidewalk=False):
 def connection_mask(c,cells,kinds):
     x,y=c
     return sum(bit for bit,n in [(1,(x,y-1)),(2,(x+1,y)),(4,(x,y+1)),(8,(x-1,y))] if cells.get(n) in kinds)
+
+
+def road_connection_mask(c,cells):
+    x,y=c
+    return connection_mask(c,cells,{'road'}) + sum(bit for bit,n in
+        [(16,(x+1,y-1)),(32,(x+1,y+1)),(64,(x-1,y+1)),(128,(x-1,y-1))]
+        if cells.get(n)=='road')
