@@ -1,6 +1,6 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.18.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.18.0/KaplanQuest-v0.18.0.apk) Â· [Download Petah Map Editor v1.8.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.18.0/PetahMapEditor-v1.8.0.apk) Â· [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.18.0/KaplanQuest-source-v0.18.0.zip)
+[Download Kaplan Quest v0.19.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.19.0/KaplanQuest-v0.19.0.apk) Â· [Download Petah Map Editor v1.9.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.19.0/PetahMapEditor-v1.9.0.apk) Â· [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.19.0/KaplanQuest-source-v0.19.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
@@ -17,6 +17,16 @@ Version 0.14.0 keeps access paving at 24px from each house doorway to the street
 The editor shares this map and uses matching object footprints. Its hover outline shows the full stamp; erase its anchor cell to remove it. Imports check the complete footprint against protected quest paths. Older 4096 x 2304 editor drafts and JSON exports convert automatically: positions double, terrain patches expand to four cells, and objects become correctly scaled stamps.
 
 Old game saves retain character designs, markers, Buddy and inventory. Positions convert to the new scale or relocate to the start if blocked. Because houses were regenerated, old room locations and chest identities reset; carried snacks remain. Old map edits that obstruct new quest anchors are kept under the local pre-grid backup key and disabled. Exported originals remain available for revision and re-import.
+
+## City density, landmarks and light rail
+
+Version 0.19.0 contains 388 enterable homes (up from 240), including 178 apartment buildings. The original 240 house IDs and doorway coordinates remain stable. A clear paving route connects every doorway to the street. Added homes are procedural game buildings within the real street layout.
+
+18 named landmark labels use the stored OpenStreetMap geometry, including Rabin Medical Center / Beilinson, Geha Mental Health Center, local schools, Itzhak Ohayon Park, Gan HaAtsmaut, Volunteers' Square and other named parks. 270 street/path signs use actual names from their source ways; English names are used where present, Hebrew otherwise. Examining a sign or landmark shows its full source name.
+
+The mapped Red Line platform locations are connected by a stylized orthogonal rail corridor through Shenkar, Shaham, Beilinson, Dankner, Krol and Pinsker. Names/order were checked against the [tram operator's station list](https://www.tevelmetro.co.il/stations/%D7%91%D7%99%D7%9C%D7%99%D7%A0%D7%A1%D7%95%D7%9F/). The rails follow the game's street grid rather than exact engineering geometry. Each stop has a paved platform and an arrival board. An animated eastbound tram visits every station once per 180-second cycle, dwelling for 10 seconds. This is a game service schedule. Service time is saved; changing map blocks does not reset it. Its clock follows elapsed time independently of movement-frame limits.
+
+[Tram station preview](docs/tram_station_v19.png) · [New directional tram art](art/tram_directional_sheet_v19.png) · [Art prompt and integration](art/tram_directional_prompt_v19.md) · [Map source notes](data/city_sources_v19.md). The art was generated with the built-in imagegen tool and compiled into four tiny directional sprites by `scripts/compile_tram_art.py`. `node city_transit_test.cjs` verifies every station's repeat timing, dwell/departure, movement, source-name matching, rail connectivity and service-clock save/resume.
 
 ## Walking across grass
 

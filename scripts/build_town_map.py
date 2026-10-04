@@ -4,8 +4,9 @@ Street connectivity and landmark geography are retained as a stylized grid.
 from pathlib import Path
 import json, base64, random, shutil, math
 from collections import deque
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from grid_surfaces import surface, connection_mask
+from city_features import rail_network, paint_rails, signs
 ROOT=Path(__file__).resolve().parents[1]
 ASSETS=ROOT/'app/src/main/assets'
 W,H,T=8192,4608,32
@@ -75,7 +76,7 @@ def main():
  def nearest(c):return min(cells,key=lambda n:math.dist(n,c))
  school=nearest(cell(32.08952,34.86965))
  markers=[{'point':point(nearest(cell(lat,lon))),'name':name} for lat,lon,name in [(32.08945,34.87302,'Khen Street'),(32.09030,34.87114,'Tzahal Street'),(32.08937,34.87052,'HaTsoarim Street')]]
- art=Image.new('RGB',(W,H));draw=ImageDraw.Draw(art)
+ art=Image.new('RGB',(W,H))
  terrain={k:sprite(k,T,T).convert('RGB') for k in ['grass','road','sidewalk','path','plaza','water']}
  zones={}
  for e in places:
@@ -166,6 +167,73 @@ def main():
    if made>=({'car':18,'bike':14,'lamp':35}.get(kind,8)):break
    x,y=RNG.randrange(1,COLS-5),RNG.randrange(1,ROWS-5)
    if place(kind,x,y,w,h):made+=1
+ # Reserve a clear, paved route from original doorways before filling city lots.
+ def connect_doors():
+  blocked=set()
+  for p in placements:
+   px,py,pw,ph=p['rect'];blocked.update((xx,yy) for xx in range(px//T,(px+pw)//T) for yy in range(py//T,(py+ph)//T))
+  for house in houses:
+   door=(house['entry'][0]//T,house['entry'][1]//T)
+   q=deque([door]);parent={door:None};goal=None
+   while q:
+    c=q.popleft()
+    if cells.get(c)=='road':goal=c;break
+    x,y=c
+    for n in [(x-1,y),(x+1,y),(x,y+1),(x,y-1)]:
+     if n in parent or n in blocked or not(0<=n[0]<COLS and 0<=n[1]<ROWS) or zones.get(n)=='water':continue
+     parent[n]=c;q.append(n)
+   if goal is None:raise ValueError(f'House doorway cannot reach street: {door}')
+   c=goal
+   while c is not None:
+    cells.setdefault(c,'access');used.add(c);paint(c,cells[c]);c=parent[c]
+ connect_doors()
+ # Retire the old stationary tram decorations; the service now animates them.
+ for parked in [p for p in placements if p['kind']=='tram']:
+  px,py,pw,ph=parked['rect']
+  for xx in range(px//T,(px+pw)//T):
+   for yy in range(py//T,(py+ph)//T):
+    art.paste(terrain['grass'],(xx*T,yy*T))
+    if (xx,yy) not in cells:used.discard((xx,yy))
+  placements.remove(parked)
+  scenery[:]=[item for item in scenery if not(item[2]=='tram' and item[:2]==parked['entry'])]
+ # Retain the original 240 house IDs, then fill city gaps with additional housing.
+ rail,rail_cells=rail_network(roads_raw,cells,placements,cell,point)
+ platform_blocked={(xx,yy) for p in placements for xx in range(p['rect'][0]//T,(p['rect'][0]+p['rect'][2])//T) for yy in range(p['rect'][1]//T,(p['rect'][1]+p['rect'][3])//T)}
+ for stop in rail['stops']:
+  index=stop['distance']//T;a=rail['path'][max(0,index-1)];b=rail['path'][min(len(rail['path'])-1,index+1)]
+  horizontal=a[1]==b[1];cx,cy=stop['point'][0]//T,stop['point'][1]//T
+  options=[[(cx+d,cy+side) if horizontal else (cx+side,cy+d) for d in [-1,0,1]] for side in [1,-1]]
+  pad=next((p for p in options if all(c not in platform_blocked and zones.get(c)!='water' and 0<=c[0]<COLS and 0<=c[1]<ROWS for c in p)),None)
+  if pad is None:raise ValueError('No safe platform at '+stop['name'])
+  for c in pad:cells.setdefault(c,'sidewalk');used.add(c);paint(c,cells[c])
+  stop['platformRect']=[min(c[0] for c in pad)*T+2,min(c[1] for c in pad)*T+2,92 if horizontal else 28,28 if horizontal else 92]
+
+ landmarks=[{'name':'Kaplan School','point':point(school),'kind':'school','source':'existing mapped campus'}]
+ for e in places:
+  tags=e.get('tags',{});name=tags.get('name:en',tags.get('name'))
+  g=e.get('geometry',[])
+  if not name or not g:continue
+  lat=sum(p['lat'] for p in g)/len(g);lon=sum(p['lon'] for p in g)/len(g)
+  if not SOUTH<=lat<=NORTH or not WEST<=lon<=EAST:continue
+  c=cell(lat,lon);kind=tags.get('amenity')
+  if kind=='hospital':
+   existing=[p for p in placements if p['kind']=='hospital']
+   if existing:
+    landmark=min(existing,key=lambda p:math.dist(p['entry'],point(c)))
+    landmarks.append({'name':name,'point':landmark['entry'],'kind':'hospital','osmId':e['id']})
+  elif kind=='school':
+   before=len(placements)
+   if near_place('school',c,5,4):landmarks.append({'name':name,'point':placements[before]['entry'],'kind':'school','osmId':e['id']})
+  elif tags.get('leisure') in {'park','garden'}:
+   landmarks.append({'name':name,'point':point(nearest(c)),'kind':'park','osmId':e['id']})
+ for _ in range(120000):
+  if len(houses)>=600:break
+  x,y=RNG.randrange(1,COLS-5),RNG.randrange(1,ROWS-5)
+  if zones.get((x,y)) in {'park','water'}:continue
+  high=len(houses)%3!=0;w,h=3,4 if high else 3
+  if any((xx,yy) in rail_cells for xx in range(x,x+w) for yy in range(y,y+h)):continue
+  place('high_building' if high else RNG.choice(['house','house_blue','house_teal']),x,y,w,h,True)
+ connect_doors()
  for _ in range(18000):
   if len(scenery)>700:break
   x,y=RNG.randrange(1,COLS-3),RNG.randrange(1,ROWS-3);kind=RNG.choice(['tree','tree','shrub','flowers']);size=2 if kind=='tree' else 1
@@ -192,7 +260,7 @@ def main():
  vehicle_cells=[]
  for x,y in sorted(cells,key=lambda c:(c[0]*101+c[1]*37)%997):
   if len(vehicles)>=48:break
-  if cells[x,y]!='road' or (x,y) in crossing_cells:continue
+  if cells[x,y]!='road' or (x,y) in crossing_cells or (x,y) in rail_cells:continue
   road_mask=connection_mask((x,y),cells,{'road'})
   if road_mask not in {5,10}:continue
   sides=[(x-1,y),(x+1,y)] if road_mask==5 else [(x,y-1),(x,y+1)]
@@ -207,10 +275,11 @@ def main():
   rect=[px,py,im.width,im.height]
   vehicles.append({'rect':rect,'cell':y*COLS+x,'orientation':orientation})
   vehicle_cells.append((x,y));scenery.append([*point((x,y)),'car'])
- try:font=ImageFont.truetype('C:/Windows/Fonts/consolab.ttf',14)
- except OSError:font=ImageFont.load_default()
- for lat,lon,label in [(32.08880,34.87318,'KHEN ST'),(32.09054,34.87137,'TZAHAL ST'),(32.08913,34.86955,'HATSOARIM ST'),(32.08795,34.86810,'KAPLAN ST'),(32.09128,34.87520,'JABOTINSKY'),(32.09028,34.86928,'KAPLAN SCHOOL')]:
-  c=nearest(cell(lat,lon));x,y=c[0]*T,c[1]*T;b=draw.textbbox((0,0),label,font=font);draw.rectangle((x,y,x+b[2]+10,y+T-1),fill='#fff7d6',outline='#344a58',width=2);draw.text((x+5,y+7),label,font=font,fill='#294159');scenery.append([*point(c),'sign',label])
+ paint_rails(art,rail)
+ street_signs=signs(art,road_records,cells,point,landmarks)
+ for sign in street_signs:scenery.append([*sign['point'],'sign',sign['name']])
+ for landmark in landmarks:scenery.append([*landmark['point'],'landmark',landmark['name']])
+ for stop in rail['stops']:scenery.append([*stop['point'],'tram_stop',stop['name']])
  # Remove NPC routes crossing newly placed buildings, splitting at blocked cells.
  npc=[]
  for route in paths:
@@ -224,7 +293,7 @@ def main():
   if len(section)>1:npc.append([point(p) for p in section])
  bits=bytearray((COLS*ROWS+7)//8);mask=Image.new('L',(COLS,ROWS))
  for x,y in cells:idx=y*COLS+x;bits[idx>>3]|=1<<(idx&7);mask.putpixel((x,y),255)
- town={'width':W,'height':H,'gridSize':T,'mapRevision':'orthogonal-v1','maskScale':T,'maskWidth':COLS,'walkBits':base64.b64encode(bits).decode(),'bounds':{'south':SOUTH,'west':WEST,'north':NORTH,'east':EAST},'start':point(start),'school':point(school),'markers':markers,'npcPaths':npc,'houses':houses,'scenery':scenery,'placements':placements,'vehicles':vehicles,'roadGrid':road_records,'osmTimestamp':roads_raw.get('osm3s',{}).get('timestamp_osm_base')}
+ town={'width':W,'height':H,'gridSize':T,'mapRevision':'orthogonal-v1','maskScale':T,'maskWidth':COLS,'walkBits':base64.b64encode(bits).decode(),'bounds':{'south':SOUTH,'west':WEST,'north':NORTH,'east':EAST},'start':point(start),'school':point(school),'markers':markers,'npcPaths':npc,'houses':houses,'scenery':scenery,'placements':placements,'vehicles':vehicles,'rail':rail,'landmarks':landmarks,'streetSigns':street_signs,'roadGrid':road_records,'osmTimestamp':roads_raw.get('osm3s',{}).get('timestamp_osm_base')}
  # Grass connects walking areas without painting shortcut paths over object footprints.
  # Open grass is a separate small mask; object footprints and water stay blocked.
  grass_bits=bytearray((COLS*ROWS+7)//8)
@@ -240,6 +309,7 @@ def main():
  town['accessCells']=[y*COLS+x for (x,y),kind in cells.items() if kind=='access']
  for c,kind in cells.items():
   if kind=='access':paint(c,kind)
+ paint_rails(art,rail)
  art.save(ROOT/'editor/src/main/assets/petah_tikva_town_map.png',optimize=True);mask.save(ASSETS/'walkmask.png',optimize=True)
  (ASSETS/'town_data.js').write_text('window.TOWN_DATA = '+json.dumps(town,separators=(',',':'))+';\n',encoding='utf-8')
  from split_town_map import split_map

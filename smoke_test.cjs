@@ -84,10 +84,10 @@ const path = require('path');
     kinds: window.TOWN_DATA.scenery.reduce((counts, item) => {
       counts[item[2]] = (counts[item[2]] || 0) + 1; return counts;
     }, {}),
-    tileCount: window.MapGrid.types.length,
+    tileCount: window.MapGrid.types.length, tramRoute: window.TOWN_DATA.rail?.path.length || 0,
   }));
-  if (cityCounts.tileCount !== 55 || cityCounts.houses < 20 ||
-      ['hospital', 'bus_stop', 'tram_stop', 'tram', 'car', 'bike', 'playground_slide',
+  if (!cityCounts.tramRoute || cityCounts.tileCount !== 55 || cityCounts.houses < 20 ||
+      ['hospital', 'bus_stop', 'tram_stop', 'car', 'bike', 'playground_slide',
         'playground_swings', 'traffic_light', 'bench'].some(kind => !cityCounts.kinds[kind]))
     throw new Error(`New city assets are missing: ${JSON.stringify(cityCounts)}`);
   const inaccessible = await page.evaluate(() => {
@@ -152,7 +152,7 @@ const path = require('path');
   const sceneryMessage = (await page.evaluate(() => window.__siteSDebug())).message;
   if (!sceneryMessage || sceneryMessage.includes('Follow the markers'))
     throw new Error(`Scenery did not respond: ${sceneryMessage}`);
-  for (const kind of ['hospital', 'bus_stop', 'tram_stop', 'tram', 'car', 'bike',
+  for (const kind of ['hospital', 'bus_stop', 'tram_stop', 'car', 'bike',
     'playground_slide', 'playground_swings']) {
     const reachable = await page.evaluate(kind => {
       for (const item of window.TOWN_DATA.scenery.filter(item => item[2] === kind)) {

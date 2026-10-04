@@ -85,6 +85,9 @@
   let battle = null;
   let saveTimer = 0;
   let phase = "title";
+  let cityTime = 0;
+  const tramService = town.rail ? new TramService(town.rail) : null;
+  const tramArt = Object.fromEntries(['up','down','left','right'].map(facing=>{const image=new Image();image.src=`tram_${facing}.png`;return [facing,image];}));
   let selectedCharacter = "andrei";
   let characterId = "andrei";
   let lastTime = 0;
@@ -257,7 +260,7 @@
         markers: markers.map(marker => marker.found),
         hp: buddy.hp, snacks: buddy.snacks, phase,
         battle: battle ? { markerIndex: battle.markerIndex, hp: battle.hp } : null,
-        peopleSeed,
+        peopleSeed, cityTime,
         interior: inside ? { id: inside.id, roof: inside.roof, x: inside.x, y: inside.y,
           facing: inside.facing, sourceX: inside.sourceX, sourceY: inside.sourceY } : null,
         openedChests: [...openedChests],
@@ -318,6 +321,7 @@
     if (!canStand(player.x, player.y)) {
       player.x = town.start[0]; player.y = town.start[1];
     }
+    cityTime = Math.max(0,Number(state.cityTime)||0);
     peopleSeed = Number(state.peopleSeed) || 1878;
     generatePeople(peopleSeed);
     characterId = Object.prototype.hasOwnProperty.call(CharacterDesign.library, state.character)
@@ -422,6 +426,7 @@
   }
   function reset() {
     if (!walkBits.length || !mapStream.ready()) return;
+    cityTime = 0;
     characterId = selectedCharacter;
     inside = null;
     openedChests.clear();
@@ -549,7 +554,11 @@
     else if (kind === "water") say("The water shimmers. Better stay on the path.", 4);
     else if (kind === "school") say("A school building stands beside the road.", 4);
     else if (kind === "bus_stop") say("A bus stop. Check the posted route before you ride.", 4);
-    else if (kind === "tram_stop") say("The light rail platform connects neighborhoods across the city.", 4);
+    else if (kind === "landmark") say(item[3], 5);
+    else if (kind === "tram_stop") {
+      const seconds = tramService?.nextArrival(item[3],cityTime);
+      say(seconds == null ? 'A light rail platform.' : seconds === 0 ? `${item[3]}: the tram is stopped at the platform.` : `${item[3]}: next tram in ${Math.ceil(seconds)} seconds. Service every 3 minutes.`,5);
+    }
     else if (kind === "car") say("A parked car. Watch for traffic before crossing.", 4);
     else if (kind === "bike") say("A bicycle is ready for a ride along the street.", 4);
     else if (kind === "tram") say("The blue and white light rail waits at the platform.", 4);
@@ -702,7 +711,8 @@
         vy: Math.sin(angle) * 70 - 20, life: 0.75 });
     }
   }
-  function update(dt, time) {
+  function update(dt, time, elapsed = dt) {
+    if (phase === "playing" || phase === "battle") cityTime += elapsed;
     if (phase !== "playing") return;
     if (CharacterStudio.isOpen || !mapOverlay.classList.contains("hidden") || !aboutOverlay.classList.contains("hidden")) return;
     if (inside) {
@@ -930,6 +940,25 @@
       "Explore the room · use A near furniture";
     drawHud(houseName(inside.id).toUpperCase(), prompt);
   }
+  function drawTransit() {
+    if (!tramService) return;
+    for (const stop of tramService.stops) {
+      const x=Math.round(stop.point[0]-camera.x),y=Math.round(stop.point[1]-camera.y);
+      if(x < -150 || y < -90 || x > W+150 || y > H+90)continue;
+      const seconds=Math.ceil(tramService.nextArrival(stop.name,cityTime));
+      ctx.fillStyle='#344a58';ctx.fillRect(x-64,y-76,128,30);
+      ctx.fillStyle='#fff6dc';ctx.fillRect(x-62,y-74,124,26);
+      ctx.font='11px Arial';ctx.textAlign='center';ctx.fillStyle='#253e4b';
+      ctx.fillText(stop.name+' station',x,y-63);
+      ctx.fillText(seconds===0?'Tram stopped':`Next tram ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`,x,y-51);
+      ctx.textAlign='left';
+    }
+    const tram=tramService.state(cityTime),x=Math.round(tram.x-camera.x),y=Math.round(tram.y-camera.y);
+    const image=tramArt[tram.facing];
+    if(image.naturalWidth && x>-90 && y>-90 && x<W+90 && y<H+90){
+      ctx.drawImage(image,x-image.width/2,y-image.height/2);
+    }
+  }
   function draw(time) {
     ctx.imageSmoothingEnabled = false;
     if (inside) { drawInterior(); return; }
@@ -959,6 +988,7 @@
       ctx.fillRect(Math.round(p.x - camera.x), Math.round(p.y - camera.y), 5, 5);
     }
     for (const person of people) if (isOpenPoint(person.x, person.y)) drawPerson(person);
+    drawTransit();
     drawPlayer();
     let prompt = "";
     if (phase === "playing" && distance(player.x, player.y, school.x, school.y) < 70)
@@ -976,9 +1006,10 @@
       !startOverlay.classList.contains("hidden") || !winOverlay.classList.contains("hidden"));
     if (startButton.disabled && mapStream.ready()) assetsReady();
     const seconds = timestamp / 1000;
-    const dt = Math.min(0.05, lastTime ? seconds - lastTime : 0);
+    const elapsed = lastTime ? Math.max(0,seconds-lastTime) : 0;
+    const dt = Math.min(0.05, elapsed);
     lastTime = seconds;
-    update(dt, seconds);
+    update(dt, seconds, elapsed);
     draw(seconds);
     requestAnimationFrame(tick);
   }
@@ -1189,6 +1220,7 @@
       walkFrame: (inside ? inside.step : player.step) > 0
         ? Math.floor(inside ? inside.step : player.step) % 2 : null,
       splashVisible: !splashScreen.classList.contains("hidden"),
+      cityTime, tram: tramService?.state(cityTime),
       ground: groundSpeed(player.x,player.y) < 1 ? "grass" : "paving", movementSpeed: SPEED*groundSpeed(player.x,player.y),
       mapLoaded: mapStream.ready(), mapStream: mapStream.stats(),
       maskLoaded: !!walkBits.length, peopleCount: people.length, peopleSeed,
@@ -1200,6 +1232,7 @@
       message,
     });
     window.__siteSTest = {
+      setCityTime(seconds) { cityTime=seconds; },
       advancePlayer(seconds, direction) { keys.add(direction); update(seconds,lastTime); keys.delete(direction); },
       walkFrameImage(id, facing, pose) {
         return (CharacterDesign.library[id]?.original ? (walkFrames[id]?.[facing]?.[pose] && CharacterDesign.withHeadphones(walkFrames[id][facing][pose],CharacterDesign.library[id],facing)) : CharacterDesign.sprite(CharacterDesign.library[id],facing,pose))?.toDataURL() || null;
