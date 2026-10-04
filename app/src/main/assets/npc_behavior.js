@@ -27,7 +27,7 @@
         if(length>0){
           person.facing=Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up');
           const spent=Math.min(remaining,length/person.speed),amount=spent*person.speed;
-          person.x+=dx/length*amount;person.y+=dy/length*amount;person.stride+=spent*7;remaining-=spent;
+          person.x+=dx/length*amount;person.y+=dy/length*amount;person.stride+=amount/40*7;remaining-=spent;
           if(amount<length-.000001)break;
         }
         person.x=person.targetX;person.y=person.targetY;person.stride=0;

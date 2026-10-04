@@ -21,7 +21,7 @@
     "playground_slide", "playground_swings", "bench", "lamp", "fountain",
   ];
   const artIndex = Object.fromEntries(atlasNames.map((name, index) => [name, index]));
-  const walkable = new Set(["road", "path", "plaza", "sidewalk", "crossing"]);
+  const walkable = new Set(["grass", "road", "path", "plaza", "sidewalk", "crossing"]);
   const terrain = new Set(["grass", "road", "path", "water", "plaza", "sidewalk", "crossing"]);
   for(const type of ['access',...Object.keys(roadMasks),...Object.keys(sidewalkMasks)]){walkable.add(type);terrain.add(type);}
   for(const [name,mask]of Object.entries(roadMasks))artIndex[name]=32+mask;
@@ -38,7 +38,7 @@
     let mask=0;
     for(const [bit,i,valid]of [[1,index-cols,index>=cols],[2,index+1,index%cols<cols-1],[4,index+cols,true],[8,index-1,index%cols>0]]){
       const next=valid?neighbour(i):null;
-      if(type==='road'?isRoad(next):type==='sidewalk'?(isSidewalk(next)||['access','path','plaza','crossing'].includes(next)):walkable.has(next))mask|=bit;
+      if(type==='road'?isRoad(next):type==='sidewalk'?(isSidewalk(next)||['access','path','plaza','crossing'].includes(next)):(next!=='grass'&&walkable.has(next)))mask|=bit;
     }
     return `${type}_${mask}`;
   }

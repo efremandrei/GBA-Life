@@ -14,6 +14,8 @@
   const mapStream = new TownStream(window.TOWN_BLOCKS);
   const map = mapStream.overview;
   const walkBits = Uint8Array.from(atob(town.walkBits), character => character.charCodeAt(0));
+  const grassBits = Uint8Array.from(atob(town.grassBits || ''), character => character.charCodeAt(0));
+  const GRASS_SPEED = 0.6;
   // Crops are aligned to the four transparent sprites generated from the supplied avatar.
   const playerViews = {
     down: [183, 92, 318, 482],
@@ -241,7 +243,10 @@
       distance(x,y,other.homeX,other.homeY)<1 || distance(x,y,other.targetX,other.targetY)<1 || distance(x,y,other.x,other.y)<20));
   }
   function updatePeople(dt) {
-    for(const person of people)NpcBehavior.update(person,dt,MapGrid.tileSize,canNpcVisit);
+    for(const person of people){
+      person.speed=40*groundSpeed(person.x,person.y);
+      NpcBehavior.update(person,dt,MapGrid.tileSize,canNpcVisit);
+    }
   }
 
   function save() {
@@ -380,7 +385,13 @@
     const mx = Math.floor(x / town.maskScale);
     const my = Math.floor(y / town.maskScale);
     const index = my * town.maskWidth + mx;
-    return !!(walkBits[index >> 3] & (1 << (index & 7)));
+    return !!((walkBits[index >> 3] | grassBits[index >> 3]) & (1 << (index & 7)));
+  }
+  function groundSpeed(x, y) {
+    const index = Math.floor(y / town.maskScale) * town.maskWidth + Math.floor(x / town.maskScale);
+    const override = mapEdits.get(index);
+    if (override) return override === 'grass' ? GRASS_SPEED : 1;
+    return grassBits[index >> 3] & (1 << (index & 7)) ? GRASS_SPEED : 1;
   }
   function canStand(x, y) {
     return [[0, 0], [-4, 0], [4, 0], [0, -4], [0, 4]]
@@ -730,14 +741,15 @@
       dx /= mag;
       dy /= mag;
       const oldX = player.x, oldY = player.y;
-      const nx = player.x + dx * SPEED * dt;
-      const ny = player.y + dy * SPEED * dt;
+      const pace = SPEED * groundSpeed(player.x, player.y);
+      const nx = player.x + dx * pace * dt;
+      const ny = player.y + dy * pace * dt;
       if (canStand(nx, player.y)) player.x = nx;
       if (canStand(player.x, ny)) player.y = ny;
       player.facing = Math.abs(dx) > Math.abs(dy)
         ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
       player.step = Math.hypot(player.x - oldX, player.y - oldY) > 0.01
-        ? player.step + dt * 7 : 0;
+        ? player.step + Math.hypot(player.x - oldX, player.y - oldY) / SPEED * 7 : 0;
       saveTimer += dt;
       if (saveTimer > 1) { saveTimer = 0; save(); }
     } else {
@@ -1177,6 +1189,7 @@
       walkFrame: (inside ? inside.step : player.step) > 0
         ? Math.floor(inside ? inside.step : player.step) % 2 : null,
       splashVisible: !splashScreen.classList.contains("hidden"),
+      ground: groundSpeed(player.x,player.y) < 1 ? "grass" : "paving", movementSpeed: SPEED*groundSpeed(player.x,player.y),
       mapLoaded: mapStream.ready(), mapStream: mapStream.stats(),
       maskLoaded: !!walkBits.length, peopleCount: people.length, peopleSeed,
       mapOpen: !mapOverlay.classList.contains("hidden"),
@@ -1187,6 +1200,7 @@
       message,
     });
     window.__siteSTest = {
+      advancePlayer(seconds, direction) { keys.add(direction); update(seconds,lastTime); keys.delete(direction); },
       walkFrameImage(id, facing, pose) {
         return (CharacterDesign.library[id]?.original ? (walkFrames[id]?.[facing]?.[pose] && CharacterDesign.withHeadphones(walkFrames[id][facing][pose],CharacterDesign.library[id],facing)) : CharacterDesign.sprite(CharacterDesign.library[id],facing,pose))?.toDataURL() || null;
       },

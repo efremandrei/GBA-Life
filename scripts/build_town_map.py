@@ -170,6 +170,11 @@ def main():
   if len(scenery)>700:break
   x,y=RNG.randrange(1,COLS-3),RNG.randrange(1,ROWS-3);kind=RNG.choice(['tree','tree','shrub','flowers']);size=2 if kind=='tree' else 1
   place(kind,x,y,size,size)
+ # An approach must not make its own building or a later prop walkable.
+ for placement in placements:
+  px,py,pw,ph=placement['rect']
+  for x in range(px//T,(px+pw)//T):
+   for y in range(py//T,(py+ph)//T):cells.pop((x,y),None)
  # Resolve sidewalk joins after all approaches and buildings are in place.
  for c,kind in cells.items():
   if kind=='sidewalk':paint(c,kind)
@@ -220,14 +225,14 @@ def main():
  bits=bytearray((COLS*ROWS+7)//8);mask=Image.new('L',(COLS,ROWS))
  for x,y in cells:idx=y*COLS+x;bits[idx>>3]|=1<<(idx&7);mask.putpixel((x,y),255)
  town={'width':W,'height':H,'gridSize':T,'mapRevision':'orthogonal-v1','maskScale':T,'maskWidth':COLS,'walkBits':base64.b64encode(bits).decode(),'bounds':{'south':SOUTH,'west':WEST,'north':NORTH,'east':EAST},'start':point(start),'school':point(school),'markers':markers,'npcPaths':npc,'houses':houses,'scenery':scenery,'placements':placements,'vehicles':vehicles,'roadGrid':road_records,'osmTimestamp':roads_raw.get('osm3s',{}).get('timestamp_osm_base')}
- # Ensure all gameplay entrances remain reachable after the school footprint.
- reached=component(start)
- for anchor in [town['school'],*[m['point'] for m in markers],*[h['entry'] for h in houses]]:
-  c=(anchor[0]//T,anchor[1]//T)
-  if c not in reached:
-   near=min(reached,key=lambda n:math.dist(n,c))
-   for n in line(c,near):cells.setdefault(n,'path');paint(n,cells[n]);idx=n[1]*COLS+n[0];bits[idx>>3]|=1<<(idx&7);mask.putpixel(n,255)
-   reached=component(start)
+ # Grass connects walking areas without painting shortcut paths over object footprints.
+ # Open grass is a separate small mask; object footprints and water stay blocked.
+ grass_bits=bytearray((COLS*ROWS+7)//8)
+ for y in range(ROWS):
+  for x in range(COLS):
+   if (x,y) not in used and (x,y) not in cells and zones.get((x,y))!='water':
+    index=y*COLS+x;grass_bits[index>>3]|=1<<(index&7)
+ town['grassBits']=base64.b64encode(grass_bits).decode()
  town['walkBits']=base64.b64encode(bits).decode()
  town['roadCells']=[y*COLS+x for (x,y),kind in cells.items() if kind=='road']
  town['pavingCells']=[y*COLS+x for (x,y),kind in cells.items() if kind in {'path','plaza'}]

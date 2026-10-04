@@ -1,6 +1,6 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.17.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.17.0/KaplanQuest-v0.17.0.apk) · [Download Petah Map Editor v1.7.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.17.0/PetahMapEditor-v1.7.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.17.0/KaplanQuest-source-v0.17.0.zip)
+[Download Kaplan Quest v0.18.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.18.0/KaplanQuest-v0.18.0.apk) · [Download Petah Map Editor v1.8.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.18.0/PetahMapEditor-v1.8.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.18.0/KaplanQuest-source-v0.18.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
@@ -17,6 +17,14 @@ Version 0.14.0 keeps access paving at 24px from each house doorway to the street
 The editor shares this map and uses matching object footprints. Its hover outline shows the full stamp; erase its anchor cell to remove it. Imports check the complete footprint against protected quest paths. Older 4096 x 2304 editor drafts and JSON exports convert automatically: positions double, terrain patches expand to four cells, and objects become correctly scaled stamps.
 
 Old game saves retain character designs, markers, Buddy and inventory. Positions convert to the new scale or relocate to the start if blocked. Because houses were regenerated, old room locations and chest identities reset; carried snacks remain. Old map edits that obstruct new quest anchors are kept under the local pre-grid backup key and disabled. Exported originals remain available for revision and re-import.
+
+## Walking across grass
+
+Version 0.18.0 allows walking across open grass at 60% of pavement speed: 99 px/s versus 165 px/s. Walking animation follows actual distance. NPCs also slow down when their occasional step crosses grass. Roads, sidewalks and interiors retain their normal speed. Buildings, trees, shrubs, decorative objects, water and road cars remain blocked. Imported grass tiles follow the same movement rule.
+
+Open grass is stored in a separate 4.5 KiB collision mask; streaming keeps the same map block budget. Object footprints override old access paths, preventing those paths from opening routes through houses or shrubs. Saves on grass resume at the saved position. The editor's grass tiles are now recognized as walkable by game imports.
+
+[Grass walking preview](docs/grass_walking_v18.png). `node grass_walking_test.cjs` verifies slower actual movement, object/vehicle collision, walking animation and saved-game resume on grass.
 
 ## Map artwork cleanup and urban buildings
 
