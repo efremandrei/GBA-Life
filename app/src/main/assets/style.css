@@ -164,3 +164,10 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 .chunk-controls { display:grid; grid-template-columns:repeat(4,1fr) auto; gap:8px; margin-top:10px; }
 .chunk-controls button { min-height:44px; padding:8px; }
 .chunk-controls button:disabled { opacity:.35; cursor:default; }
+
+.mission-clock { position:absolute; top:10px; left:12px; right:12px; padding:8px; text-align:center; border:3px solid #344e57; background:#fff5d8f5; color:#243b4a; pointer-events:none; }
+.mission-clock div { font-size:11px; font-weight:bold; }
+.mission-clock strong { display:block; font-size:clamp(40px,10vw,60px); line-height:1.1; font-variant-numeric:tabular-nums; }
+.mission-clock span { display:block; font-size:12px; }
+.mission-clock.late { color:#ac302f; }
+.mission-clock button { pointer-events:auto; margin-top:6px; }

@@ -46,11 +46,15 @@
     <section class="console" aria-label="Playable map game">
       <div class="screen-wrap">
         <canvas id="game" width="640" height="480" tabindex="0" aria-label="Touch and hold above, below, left or right of the character to walk. Pinch to zoom. Arrow keys, WASD and direction controls also work."></canvas>
+        <div id="missionClock" class="mission-clock hidden" aria-label="School mission clock">
+          <div>QUEST 1: TAKE EMILY TO SCHOOL</div><strong id="missionTime">07:30</strong>
+          <span id="missionDeadline">Arrive before 08:00</span><button id="retrySchoolQuest" class="small-button hidden" type="button">Retry from 07:30</button>
+        </div>
         <div id="startOverlay" class="overlay">
           <div class="overlay-card">
             <span class="tag">NEW ADVENTURE</span>
             <h2>Reach Kaplan School</h2>
-            <p>Start at Hen 14, explore furnished houses, meet townspeople, find three markers, and face two original creatures.</p>
+            <p>Andrei starts at Hen 14 at 07:30: take Emily to Kaplan School before 08:00. Then explore town, find three markers, and face two original creatures.</p>
             <p class="picker-title">Choose your character</p>
             <div id="characterPicker" class="character-picker" role="group" aria-label="Choose your character">
               <button class="character-choice selected" type="button" data-character="andrei" aria-pressed="true"><canvas width="64" height="80" aria-hidden="true"></canvas><span>Andrei</span></button>
@@ -91,7 +95,7 @@
           <div class="overlay-card about-card">
             <span class="tag">ABOUT</span>
             <h2>Kaplan Quest</h2>
-            <p>Version 0.25.0 (build 25). Original pixel-art walking adventure with character choices, enterable houses, city scenery, and editable map imports. Real street layout: © OpenStreetMap contributors (ODbL), checked against Google Maps. Buildings and scenery are stylized.</p>
+            <p>Version 0.26.0 (build 26). Original pixel-art walking adventure with character choices, enterable houses, city scenery, and editable map imports. Real street layout: © OpenStreetMap contributors (ODbL), checked against Google Maps. Buildings and scenery are stylized.</p>
             <p>Created for Andrei Efremuahkin · andrei.efr@gmail.com</p>
             <p id="repoLine">Repository: https://github.com/efremandrei/GBA-Life</p>
             <button id="closeAboutButton" class="primary-button" type="button">Close</button>

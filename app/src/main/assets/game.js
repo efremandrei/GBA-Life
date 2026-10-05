@@ -97,6 +97,64 @@
   let saveTimer = 0;
   let phase = "title";
   let cityTime = 0;
+  let daySeconds=0, schoolQuest={status:'active',trail:[]};
+  const schoolQuestApplies=()=>characterId==='andrei';
+  const schoolQuestPending=()=>schoolQuestApplies()&&schoolQuest.status!=='completed';
+  function schoolClockText() {
+    const minutes=450+Math.floor(daySeconds/5);
+    return `${String(Math.floor(minutes/60)%24).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
+  }
+  function seedEmilyTrail() {
+    const candidate=[[0,28],[28,0],[-28,0],[0,-28]].map(([dx,dy])=>({x:player.x+dx,y:player.y+dy,facing:player.facing})).find(p=>canStand(p.x,p.y));
+    schoolQuest.trail=[candidate||{x:player.x,y:player.y,facing:player.facing},{x:player.x,y:player.y,facing:player.facing}];
+  }
+  function missionEmily() {
+    const trail=schoolQuest.trail;
+    if(!trail.length)return {x:player.x,y:player.y,facing:player.facing,step:0};
+    let remaining=28,index=trail.length-1;
+    while(index>0 && remaining>0){remaining-=Math.hypot(trail[index].x-trail[index-1].x,trail[index].y-trail[index-1].y);index--;}
+    const pos=trail[index];return {...pos,step:player.step};
+  }
+  function updateSchoolClock() {
+    const element=document.getElementById('missionClock');
+    const visible=phase==='playing'&&schoolQuestPending();
+    element.classList.toggle('hidden',!visible);element.classList.toggle('late',schoolQuest.status==='failed');
+    document.getElementById('missionTime').textContent=schoolClockText();
+    document.getElementById('missionDeadline').textContent=schoolQuest.status==='failed'?'Too late - school starts at 08:00':'Arrive before 08:00';
+    document.getElementById('retrySchoolQuest').classList.toggle('hidden',schoolQuest.status!=='failed');
+  }
+  function completeSchoolQuest() {
+    if(!schoolQuestPending()||schoolQuest.status!=='active'||daySeconds>=150)return false;
+    schoolQuest.status='completed';schoolQuest.completedAt=schoolClockText();schoolQuest.trail=[];
+    say(`Emily reached school at ${schoolClockText()}! Quest 1 passed. Next: find the 3 route markers.`,8);
+    save();updateSchoolClock();return true;
+  }
+  function tickSchoolQuest(elapsed) {
+    if(document.hidden||phase!=='playing'||CharacterStudio.isOpen||!mapOverlay.classList.contains('hidden')||!aboutOverlay.classList.contains('hidden')||gameMenu.classList.contains('open'))return;
+    if(schoolQuestPending()&&schoolQuest.status==='failed')return;
+    daySeconds+=elapsed;
+    if(schoolQuestPending()&&schoolQuest.status==='active'&&daySeconds>=150) {
+      daySeconds=150;schoolQuest.status='failed';keys.clear();touch.clear();stopScreenWalk();
+      say('08:00: Emily is late. Retry the school mission.',6);save();
+    }
+    // Autosave even while standing still, including the mission's exact clock.
+    if(Math.floor(daySeconds)!==Math.floor(daySeconds-elapsed))save();
+  }
+  function updateEmilyTrail() {
+    if(!schoolQuestPending()||schoolQuest.status!=='active'||inside)return;
+    const last=schoolQuest.trail.at(-1);
+    if(!last||distance(last.x,last.y,player.x,player.y)>=3)schoolQuest.trail.push({x:player.x,y:player.y,facing:player.facing});
+    if(schoolQuest.trail.length>64)schoolQuest.trail.shift();
+    const emily=missionEmily();
+    if(distance(player.x,player.y,school.x,school.y)<35&&distance(emily.x,emily.y,school.x,school.y)<75)completeSchoolQuest();
+  }
+  function retrySchoolQuest() {
+    if(!schoolQuestApplies()||schoolQuest.status!=='failed')return;
+    daySeconds=0;schoolQuest={status:'active',trail:[]};inside=null;player.x=town.start[0];player.y=town.start[1];
+    player.step=0;seedEmilyTrail();keys.clear();touch.clear();stopScreenWalk();
+    camera.x=clamp(player.x-viewWidth()/2,0,WORLD_W-viewWidth());camera.y=clamp(player.y-viewHeight()/2,0,WORLD_H-viewHeight());
+    say('07:30: Emily is ready. Take her to Kaplan School before 08:00.',7);save();updateSchoolClock();
+  }
   const tramService = town.rail ? new TramService(town.rail) : null;
   const tramArt = Object.fromEntries(['up','down','left','right'].map(facing=>{const image=new Image();image.src=`tram_${facing}.png`;return [facing,image];}));
   let selectedCharacter = "andrei";
@@ -271,7 +329,7 @@
         markers: markers.map(marker => marker.found),
         hp: buddy.hp, snacks: buddy.snacks, phase,
         battle: battle ? { markerIndex: battle.markerIndex, hp: battle.hp } : null,
-        peopleSeed, cityTime, worldZoom, roomZoom:roomView.zoom,
+        peopleSeed, cityTime, daySeconds, schoolQuest, worldZoom, roomZoom:roomView.zoom,
         interior: inside ? { id: inside.id, roof: inside.roof, x: inside.x, y: inside.y,
           facing: inside.facing, sourceX: inside.sourceX, sourceY: inside.sourceY } : null,
         openedChests: [...openedChests],
@@ -340,7 +398,13 @@
     characterId = Object.prototype.hasOwnProperty.call(CharacterDesign.library, state.character)
       ? state.character : "andrei";
     selectCharacter(characterId);
+    daySeconds=Math.max(0,Number(state.daySeconds)||0);
+    const savedQuest=state.schoolQuest;
+    schoolQuest={status:['active','failed','completed'].includes(savedQuest?.status)?savedQuest.status:state.phase==='won'?'completed':'active',
+      completedAt:savedQuest?.completedAt,
+      trail:Array.isArray(savedQuest?.trail)?savedQuest.trail.filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)).slice(-64):[]};
     player.facing = playerViews[state.facing] ? state.facing : "down";
+    if(!schoolQuest.trail.length)seedEmilyTrail();
     markers.forEach((marker, index) => { marker.found = !!state.markers?.[index]; });
     buddy.hp = clamp(Number(state.hp) || 24, 1, 24);
     buddy.snacks = clamp(Number(state.snacks) || 0, 0, 2);
@@ -446,14 +510,14 @@
   }
   function reset() {
     if (!walkBits.length || !mapStream.ready()) return;
-    cityTime = 0;
+    cityTime = 0;daySeconds=0;schoolQuest={status:'active',trail:[]};
     characterId = selectedCharacter;
     inside = null;
     openedChests.clear();
     player.x = town.start[0];
     player.y = town.start[1];
     player.facing = "down";
-    player.step = 0;
+    player.step = 0;seedEmilyTrail();
     camera.x = clamp(player.x - viewWidth() / 2, 0, WORLD_W - viewWidth());
     camera.y = clamp(player.y - viewHeight() / 2, 0, WORLD_H - viewHeight());
     markers.forEach(marker => { marker.found = false; });
@@ -471,7 +535,7 @@
     battleOverlay.classList.add("hidden");
     updateStatus();
     save();
-    say("Collect 3 gold markers, then enter Kaplan School.", 5);
+    say(schoolQuestApplies()?"07:30: take Emily to Kaplan School before 08:00. She follows you.":"Collect 3 gold markers, then enter Kaplan School.", 7);
     canvas.focus();
   }
   function openCharacterSelect() {
@@ -616,6 +680,11 @@
       return;
     }
     if (inside) { interactInside(); return; }
+    if(schoolQuestPending()&&distance(player.x,player.y,school.x,school.y)<70) {
+      if(schoolQuest.status==='failed')say('Emily is late. Tap Retry from 07:30.',5);
+      else if(distance(missionEmily().x,missionEmily().y,school.x,school.y)<100)completeSchoolQuest();
+      return;
+    }
     if (distance(player.x, player.y, school.x, school.y) < 70) {
       if (foundCount() === markers.length) {
         phase = "won";
@@ -744,6 +813,7 @@
   function update(dt, time, elapsed = dt) {
     if (phase === "playing" || phase === "battle") cityTime += elapsed;
     if (phase !== "playing") { stopScreenWalk(); return; }
+    tickSchoolQuest(elapsed);
     updateScreenWalk();
     if (gamePinch?.active) { player.step=0; if(inside)inside.step=0; return; }
     if (CharacterStudio.isOpen || !mapOverlay.classList.contains("hidden") || !aboutOverlay.classList.contains("hidden")) return;
@@ -806,8 +876,9 @@
       camera.y += (targetY - camera.y) * ease;
     }
 
+    updateEmilyTrail();
     for (const [index, marker] of markers.entries()) {
-      if (!marker.found && distance(player.x, player.y, marker.x, marker.y) < 23) {
+      if (!schoolQuestPending() && !marker.found && distance(player.x, player.y, marker.x, marker.y) < 23) {
         marker.found = true;
         spawnBurst(marker.x, marker.y);
         say(`${marker.name} marker found!  ${foundCount()}/3`, 3);
@@ -978,6 +1049,7 @@
     ctx.imageSmoothingEnabled=false;ctx.drawImage(CharacterDesign.worldSprite(source),x-12,y-32);
   }
   function drawHud(label, prompt) {
+    if(!schoolQuestPending()) {
     const leftWidth = Math.min(211, Math.floor(W * .56));
     const rightWidth = W < 540 ? 104 : 151;
     panel(12, 12, leftWidth, 38);
@@ -990,7 +1062,8 @@
     panel(W - rightWidth - 12, 12, rightWidth, 38);
     ctx.fillStyle = "#25364b";
     ctx.fillText(`★ ${foundCount()}/3`, W - rightWidth - 2, 38);
-    const line = message && phase === "playing" ? message : prompt;
+    }
+    const line = message && phase === "playing" ? message : schoolQuestPending()?"Take Emily to Kaplan School before 08:00.":prompt;
     if (!line || phase !== "playing") return;
     const boxY = W < 540 ? H - 203 : H - 75;
     panel(12, boxY, W - 24, 63);
@@ -1038,6 +1111,7 @@
     }
   }
   function draw(time) {
+    updateSchoolClock();
     ctx.imageSmoothingEnabled = false;
     if (inside) { drawInterior(); return; }
     ctx.save();ctx.scale(worldZoom,worldZoom);
@@ -1068,6 +1142,11 @@
     }
     for (const person of people) if (isOpenPoint(person.x, person.y)) drawPerson(person);
     drawTransit();
+    if(schoolQuestPending()) {
+      const e=missionEmily();ctx.fillStyle='#394a4d88';ctx.beginPath();ctx.ellipse(e.x-camera.x,e.y-camera.y+3,9,3,0,0,Math.PI*2);ctx.fill();
+      const source=CharacterDesign.worldSprite(CharacterDesign.sprite(CharacterDesign.library.emily,e.facing,e.step>0?Math.floor(e.step)%2:-1));
+      ctx.drawImage(source,Math.round(e.x-camera.x-12),Math.round(e.y-camera.y-30),24,32);
+    }
     drawPlayer();
     ctx.restore();
     let prompt = "";
@@ -1181,6 +1260,7 @@
   });
   window.addEventListener("blur", () => { keys.clear(); touch.clear();stopScreenWalk(); });
   document.addEventListener("visibilitychange", () => {
+    lastTime=0;
     if (document.hidden) { stopScreenWalk(); keys.clear();touch.clear();saveProgress(); }
   });
   window.addEventListener("pagehide", saveProgress);
@@ -1247,6 +1327,7 @@
   gameMenu.addEventListener("click", event => {
     if (event.target.closest("button")) closeMenu();
   });
+  document.getElementById('retrySchoolQuest').addEventListener('click',retrySchoolQuest);
   document.getElementById("mapButton").addEventListener("click", () => { closeMenu(); openMap(); });
   document.getElementById("closeMapButton").addEventListener("click", closeMap);
   document.getElementById('localMapButton').addEventListener('click',showLocalMap);
@@ -1363,6 +1444,7 @@
       walkFrame: (inside ? inside.step : player.step) > 0
         ? Math.floor(inside ? inside.step : player.step) % 2 : null,
       splashVisible: !splashScreen.classList.contains("hidden"),
+      daySeconds,schoolTime:schoolClockText(),schoolQuest:schoolQuest.status,emily:missionEmily(),
       cityTime, tram: tramService?.state(cityTime),
       ground: groundSpeed(player.x,player.y) < 1 ? "grass" : "paving", movementSpeed: SPEED*groundSpeed(player.x,player.y),
       mapLoaded: mapStream.ready(), mapStream: mapStream.stats(),
@@ -1377,6 +1459,7 @@
       message,
     });
     window.__siteSTest = {
+      advanceDay(seconds) { tickSchoolQuest(seconds);updateSchoolClock(); },
       setCityTime(seconds) { cityTime=seconds; },
       advancePlayer(seconds, direction) { keys.add(direction); update(seconds,lastTime); keys.delete(direction); },
       walkFrameImage(id, facing, pose) {
@@ -1384,7 +1467,7 @@
       },
       setPlayer(x, y) {
         if (!canStand(x, y)) return false;
-        player.x = x; player.y = y;
+        player.x = x; player.y = y;seedEmilyTrail();
         camera.x = clamp(x - viewWidth() / 2, 0, WORLD_W - viewWidth());
         camera.y = clamp(y - viewHeight() / 2, 0, WORLD_H - viewHeight());
         return true;

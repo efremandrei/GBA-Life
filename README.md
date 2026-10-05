@@ -1,12 +1,16 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.25.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.25.0/KaplanQuest-v0.25.0.apk) · [Download Petah Map Editor v1.14.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.25.0/PetahMapEditor-v1.14.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.25.0/KaplanQuest-source-v0.25.0.zip)
+[Download Kaplan Quest v0.26.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.26.0/KaplanQuest-v0.26.0.apk) · [Download Petah Map Editor v1.14.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.25.0/PetahMapEditor-v1.14.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.26.0/KaplanQuest-source-v0.26.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
 [Splash screen](docs/preview_splash_v8.png) · [Character chooser](docs/chooser_emulator_v10.png) · [55-tile editor sidebar](docs/preview_sidewalk_palette_v1.6.0.png) · [Connected sidewalks](docs/preview_sidewalks_v14.png) · [Exit Game menu](docs/preview_exit_menu_v7.png) · [House interior](docs/preview_house_v6.png) · [City sprite sheet](art/town_sprite_sheet_city.png)
 
 An offline, original pixel-art walking game for Android. Explore a stylized part of **Petah Tikva** with a street network based on real map data. Start near Khen Street, collect markers at Khen, Tzahal, and HaTsoarim streets, and reach Kaplan School. The map covers approximately **32.081–32.096° N, 34.858–34.889° E** around the school; it is a game map of this area, not the entire city or a navigation map. Buildings, parks, and characters are decorative interpretations.
+
+## Andrei: Emily's school mission
+
+Game v0.26.0 starts Andrei's first quest at Hen 14 at 07:30. Emily follows his actual walking path. Reach Kaplan School with her before 08:00; arriving at the entrance or pressing A nearby delivers her. Every 5 seconds of active play advances one game minute, giving 150 seconds for the school run. The large top clock keeps its size while zooming. Map/menu/designer/About and background time pause the clock. At 08:00 the attempt fails and Retry restores Hen 14 at 07:30 without deleting prior quest rewards. Quest completion and the clock save/resume. After delivery, the existing three-marker route continues; other characters retain that adventure. Older saves initialize the new mission at 07:30, preserving their map/progress; already won saves treat it as completed. [Large clock preview](docs/school_clock_v26.png). `node school_quest_test.cjs` checks actual time rate, following, deadline/retry, pause and persistence.
 
 ## Borderless paving
 
