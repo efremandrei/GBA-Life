@@ -869,36 +869,76 @@
     ctx.drawImage(CharacterDesign.worldSprite(CharacterDesign.sprite(person.design,facing,person.motion==="outbound"||person.motion==="return"?Math.floor(person.stride)%2:-1)),x-12,y-32);
   }
 
-  function drawOverview() {
-    if (!map.complete || !map.naturalWidth) return;
-    overviewCtx.imageSmoothingEnabled = false;
-    overviewCtx.drawImage(map, 0, 0, overview.width, overview.height);
-    for (const [index, type] of mapEdits) {
-      const cols = WORLD_W / MapGrid.tileSize;
-      const worldX = index % cols * MapGrid.tileSize;
-      const worldY = Math.floor(index / cols) * MapGrid.tileSize;
-      MapGrid.drawTile(overviewCtx, MapGrid.connectedType(mapEdits,index,cols,baseRoads,baseAccess,baseSidewalks,basePaving), worldX / WORLD_W * overview.width,
-        worldY / WORLD_H * overview.height, MapGrid.tileSize / WORLD_W * overview.width);
+  const chunkView={col:0,row:0,image:null,ready:false,failed:false};
+  const chunkManifest=window.TOWN_BLOCKS;
+  function chunkBounds() {
+    const x=chunkView.col*chunkManifest.blockSize,y=chunkView.row*chunkManifest.blockSize;
+    return {x,y,w:Math.min(chunkManifest.blockSize,WORLD_W-x),h:Math.min(chunkManifest.blockSize,WORLD_H-y)};
+  }
+  function releaseLocalMap() {
+    if(chunkView.image) {
+      chunkView.image.onload=null;chunkView.image.onerror=null;chunkView.image.removeAttribute('src');
     }
-    const point = (x, y, color, radius) => {
-      const px = x / WORLD_W * overview.width;
-      const py = y / WORLD_H * overview.height;
-      overviewCtx.fillStyle = "#203444";
-      overviewCtx.fillRect(px - radius - 2, py - radius - 2, radius * 2 + 4, radius * 2 + 4);
-      overviewCtx.fillStyle = color;
-      overviewCtx.fillRect(px - radius, py - radius, radius * 2, radius * 2);
+    chunkView.image=null;chunkView.ready=false;chunkView.failed=false;
+  }
+  function selectMapChunk(col,row) {
+    col=clamp(col,0,chunkManifest.columns-1);row=clamp(row,0,chunkManifest.rows-1);
+    if(chunkView.image && !chunkView.failed && col===chunkView.col && row===chunkView.row) { drawOverview();return; }
+    releaseLocalMap();chunkView.col=col;chunkView.row=row;
+    const image=new Image();chunkView.image=image;
+    image.onload=()=>{if(chunkView.image===image){chunkView.ready=true;drawOverview();}};
+    image.onerror=()=>{if(chunkView.image===image){chunkView.failed=true;drawOverview();}};
+    image.src=`town_blocks/${col}_${row}.png`;
+    drawOverview();
+  }
+  function showLocalMap() {
+    selectMapChunk(Math.floor(player.x/chunkManifest.blockSize),Math.floor(player.y/chunkManifest.blockSize));
+  }
+  function moveMapChunk(direction) {
+    const offsets={left:[-1,0],right:[1,0],up:[0,-1],down:[0,1]},offset=offsets[direction];
+    if(offset)selectMapChunk(chunkView.col+offset[0],chunkView.row+offset[1]);
+  }
+  function drawOverview() {
+    if(mapOverlay.classList.contains('hidden'))return;
+    const area=chunkBounds(),scale=overview.width/area.w;
+    overview.height=Math.round(area.h*scale);
+    overviewCtx.imageSmoothingEnabled=false;
+    overviewCtx.fillStyle='#91bb92';overviewCtx.fillRect(0,0,overview.width,overview.height);
+    if(chunkView.ready)overviewCtx.drawImage(chunkView.image,0,0,overview.width,overview.height);
+    else if(map.naturalWidth)overviewCtx.drawImage(map,area.x/WORLD_W*map.width,area.y/WORLD_H*map.height,
+      area.w/WORLD_W*map.width,area.h/WORLD_H*map.height,0,0,overview.width,overview.height);
+    const cols=WORLD_W/MapGrid.tileSize;
+    overviewCtx.save();overviewCtx.scale(scale,scale);overviewCtx.translate(-area.x,-area.y);
+    const firstX=Math.max(0,Math.floor(area.x/MapGrid.tileSize)-4),lastX=Math.ceil((area.x+area.w)/MapGrid.tileSize);
+    const firstY=Math.max(0,Math.floor(area.y/MapGrid.tileSize)-4),lastY=Math.ceil((area.y+area.h)/MapGrid.tileSize);
+    for(let y=firstY;y<lastY;y++)for(let x=firstX;x<lastX;x++) {
+      const type=MapGrid.connectedType(mapEdits,y*cols+x,cols,baseRoads,baseAccess,baseSidewalks,basePaving);
+      if(type)MapGrid.drawTile(overviewCtx,type,x*MapGrid.tileSize,y*MapGrid.tileSize,MapGrid.tileSize,true);
+    }
+    overviewCtx.restore();
+    const visible=(x,y)=>x>=area.x&&x<area.x+area.w&&y>=area.y&&y<area.y+area.h;
+    const point=(x,y,color,radius)=>{
+      if(!visible(x,y))return;
+      const px=(x-area.x)*scale,py=(y-area.y)*scale;
+      overviewCtx.fillStyle='#203444';overviewCtx.fillRect(px-radius-2,py-radius-2,radius*2+4,radius*2+4);
+      overviewCtx.fillStyle=color;overviewCtx.fillRect(px-radius,py-radius,radius*2,radius*2);
     };
-    point(school.x, school.y, "#dd5752", 5);
-    for (const marker of markers) if (!marker.found) point(marker.x, marker.y, "#ffde5b", 4);
-    point(player.x, player.y, "#4c91e3", 5);
+    point(school.x,school.y,'#dd5752',5);
+    for(const marker of markers)if(!marker.found)point(marker.x,marker.y,'#ffde5b',4);
+    point(player.x,player.y,'#4c91e3',5);
+    document.getElementById('mapChunkLabel').textContent=`Chunk ${chunkView.row*chunkManifest.columns+chunkView.col+1} / ${chunkManifest.columns*chunkManifest.rows} - column ${chunkView.col+1}, row ${chunkView.row+1}`+
+      (chunkView.failed?' - Could not load. Tap Here or reopen to retry.':!chunkView.ready?' - Loading...':'');
+    const disabled={left:chunkView.col===0,right:chunkView.col===chunkManifest.columns-1,up:chunkView.row===0,down:chunkView.row===chunkManifest.rows-1};
+    for(const button of document.querySelectorAll('[data-map-direction]'))button.disabled=disabled[button.dataset.mapDirection];
   }
   function openMap() {
-    if (phase === "battle") return;
-    keys.clear(); touch.clear();
-    drawOverview();
-    mapOverlay.classList.remove("hidden");
+    if(phase==='battle')return;
+    keys.clear();touch.clear();stopScreenWalk();
+    mapOverlay.classList.remove('hidden');showLocalMap();
   }
-  function closeMap() { mapOverlay.classList.add("hidden"); }
+  function closeMap() {
+    mapOverlay.classList.add('hidden');releaseLocalMap();
+  }
   function setMapStatus(text) { mapStatus.textContent = text; }
   function applyEditedMap(json) {
     const previous = mapEdits;
@@ -1060,6 +1100,9 @@
   };
   window.addEventListener("keydown", event => {
     if(CharacterStudio.isOpen) { if(event.code==="Escape") CharacterStudio.close(); return; }
+    if(!mapOverlay.classList.contains('hidden')&&keyMap[event.code]) {
+      event.preventDefault();moveMapChunk(keyMap[event.code]);return;
+    }
     if (phase === "title" && event.target instanceof HTMLButtonElement && event.code !== "Escape") return;
     if (event.code === "Escape" && !mapOverlay.classList.contains("hidden")) {
       closeMap(); return;
@@ -1206,6 +1249,8 @@
   });
   document.getElementById("mapButton").addEventListener("click", () => { closeMenu(); openMap(); });
   document.getElementById("closeMapButton").addEventListener("click", closeMap);
+  document.getElementById('localMapButton').addEventListener('click',showLocalMap);
+  for(const button of document.querySelectorAll('[data-map-direction]'))button.addEventListener('click',()=>moveMapChunk(button.dataset.mapDirection));
   const mapFileInput = document.getElementById("mapFileInput");
   document.getElementById("importMapButton").addEventListener("click", () => {
     if (window.NativeGame?.importMap) window.NativeGame.importMap();
@@ -1323,6 +1368,8 @@
       mapLoaded: mapStream.ready(), mapStream: mapStream.stats(),
       maskLoaded: !!walkBits.length, peopleCount: people.length, peopleSeed,
       mapOpen: !mapOverlay.classList.contains("hidden"),
+      localMap:{col:chunkView.col,row:chunkView.row,ready:chunkView.ready,loadedImages:chunkView.image?1:0,
+        decodedBytes:chunkView.ready?chunkView.image.naturalWidth*chunkView.image.naturalHeight*4:0},
       characterSize: {width:24,height:32}, npcSize: {width:24,height:32},
       mapEdits: mapEdits.size, interior: inside?.id ?? null,
       houseCount: town.houses?.length ?? 0, sceneryCount: town.scenery?.length ?? 0,

@@ -1,12 +1,16 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.23.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.23.0/KaplanQuest-v0.23.0.apk) · [Download Petah Map Editor v1.13.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.22.0/PetahMapEditor-v1.13.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.23.0/KaplanQuest-source-v0.23.0.zip)
+[Download Kaplan Quest v0.24.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.24.0/KaplanQuest-v0.24.0.apk) · [Download Petah Map Editor v1.13.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.22.0/PetahMapEditor-v1.13.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.24.0/KaplanQuest-source-v0.24.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
 [Splash screen](docs/preview_splash_v8.png) · [Character chooser](docs/chooser_emulator_v10.png) · [55-tile editor sidebar](docs/preview_sidewalk_palette_v1.6.0.png) · [Connected sidewalks](docs/preview_sidewalks_v14.png) · [Exit Game menu](docs/preview_exit_menu_v7.png) · [House interior](docs/preview_house_v6.png) · [City sprite sheet](art/town_sprite_sheet_city.png)
 
 An offline, original pixel-art walking game for Android. Explore a stylized part of **Petah Tikva** with a street network based on real map data. Start near Khen Street, collect markers at Khen, Tzahal, and HaTsoarim streets, and reach Kaplan School. The map covers approximately **32.081–32.096° N, 34.858–34.889° E** around the school; it is a game map of this area, not the entire city or a navigation map. Buildings, parks, and characters are decorative interpretations.
+
+## Local map browser
+
+Game v0.24.0 opens Map on the player's current chunk of the existing 8-column, 5-row town grid (40 chunks). Left/up/down/right arrow buttons or keyboard directions browse neighboring chunks. Here returns to your location; reopening always starts there, including from a house. Edge arrows disable instead of wrapping. Local markers and edited tiles are drawn in their chunk. The last row retains its shorter height without stretching. One full-quality chunk image is loaded for browsing, released on Close; the full city image is never loaded. [Local map](docs/local_map_v24.png). `node local_map_test.cjs` checks all 40 chunks, edges, local reopening, keyboard controls, player pause, image eviction, aspect ratio and phone width.
 
 ## Touch navigation
 

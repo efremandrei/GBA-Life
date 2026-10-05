@@ -91,7 +91,7 @@
           <div class="overlay-card about-card">
             <span class="tag">ABOUT</span>
             <h2>Kaplan Quest</h2>
-            <p>Version 0.23.0 (build 23). Original pixel-art walking adventure with character choices, enterable houses, city scenery, and editable map imports. Real street layout: © OpenStreetMap contributors (ODbL), checked against Google Maps. Buildings and scenery are stylized.</p>
+            <p>Version 0.24.0 (build 24). Original pixel-art walking adventure with character choices, enterable houses, city scenery, and editable map imports. Real street layout: © OpenStreetMap contributors (ODbL), checked against Google Maps. Buildings and scenery are stylized.</p>
             <p>Created for Andrei Efremuahkin · andrei.efr@gmail.com</p>
             <p id="repoLine">Repository: https://github.com/efremandrei/GBA-Life</p>
             <button id="closeAboutButton" class="primary-button" type="button">Close</button>
@@ -124,7 +124,15 @@
     <div id="mapOverlay" class="map-overlay hidden" role="dialog" aria-modal="true" aria-label="Petah Tikva town map">
       <div class="map-card">
         <div class="map-heading"><div><p class="eyebrow">REAL STREETS · PIXEL WORLD</p><h2>Petah Tikva</h2></div><button id="closeMapButton" class="small-button" type="button">Close</button></div>
-        <canvas id="overviewMap" width="640" height="360" aria-label="Town overview showing your position, route markers, and school"></canvas>
+        <canvas id="overviewMap" width="640" height="640" aria-label="Local map chunk showing your position, route markers, and school"></canvas>
+        <div class="chunk-controls" aria-label="Browse map chunks">
+          <button class="small-button" data-map-direction="left" aria-label="Map chunk to the left">&#8592;</button>
+          <button class="small-button" data-map-direction="up" aria-label="Map chunk above">&#8593;</button>
+          <button class="small-button" data-map-direction="down" aria-label="Map chunk below">&#8595;</button>
+          <button class="small-button" data-map-direction="right" aria-label="Map chunk to the right">&#8594;</button>
+          <button id="localMapButton" class="small-button" type="button">Here</button>
+        </div>
+        <p id="mapChunkLabel" role="status" aria-live="polite"></p>
         <p>Blue: you · Gold: route markers · Red: Kaplan School</p>
         <p class="map-credit">Street geometry © OpenStreetMap contributors · visually checked with Google Maps</p>
       </div>
