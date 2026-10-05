@@ -1,12 +1,16 @@
 # GBA-Life: Kaplan Quest and Petah Map Editor
 
-[Download Kaplan Quest v0.24.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.24.0/KaplanQuest-v0.24.0.apk) · [Download Petah Map Editor v1.13.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.22.0/PetahMapEditor-v1.13.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.24.0/KaplanQuest-source-v0.24.0.zip)
+[Download Kaplan Quest v0.25.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.25.0/KaplanQuest-v0.25.0.apk) · [Download Petah Map Editor v1.14.0](https://github.com/efremandrei/GBA-Life/releases/download/v0.25.0/PetahMapEditor-v1.14.0.apk) · [Download the source ZIP](https://github.com/efremandrei/GBA-Life/releases/download/v0.25.0/KaplanQuest-source-v0.25.0.zip)
 
 ![Petah Map Editor on Android](docs/editor_emulator.png)
 
 [Splash screen](docs/preview_splash_v8.png) · [Character chooser](docs/chooser_emulator_v10.png) · [55-tile editor sidebar](docs/preview_sidewalk_palette_v1.6.0.png) · [Connected sidewalks](docs/preview_sidewalks_v14.png) · [Exit Game menu](docs/preview_exit_menu_v7.png) · [House interior](docs/preview_house_v6.png) · [City sprite sheet](art/town_sprite_sheet_city.png)
 
 An offline, original pixel-art walking game for Android. Explore a stylized part of **Petah Tikva** with a street network based on real map data. Start near Khen Street, collect markers at Khen, Tzahal, and HaTsoarim streets, and reach Kaplan School. The map covers approximately **32.081–32.096° N, 34.858–34.889° E** around the school; it is a game map of this area, not the entire city or a navigation map. Buildings, parks, and characters are decorative interpretations.
+
+## Borderless paving
+
+Game v0.25.0 / editor v1.14.0 replace the path tile's repeated vertical curb stripe with uniform beige paving. The shared atlases, town image, overview and all 40 game blocks use the new artwork. Saved map edits and collision geometry stay compatible. The generated source and prompt are in `art/path_borderless_source.png` and `art/path_borderless_prompt.md`; `prepare_tile_art.py` preserves the override on rebuild. [Repeated paving preview](docs/borderless_path_v25.png).
 
 ## Local map browser
 

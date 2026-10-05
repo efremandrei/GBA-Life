@@ -82,6 +82,9 @@ def main() -> None:
                 tile = Image.new("RGBA", (SIZE, SIZE))
                 tile.alpha_composite(resized, ((SIZE - resized.width) // 2,
                                                SIZE - resized.height - 2))
+            if name == "path":
+                # Keep the generated borderless path override on every rebuild.
+                tile = Image.open(ROOT / "art/path_borderless_source.png").convert("RGBA").resize((SIZE, SIZE), Image.Resampling.NEAREST)
             tile.save(tile_dir / f"{name}.png", optimize=True)
             atlas.alpha_composite(tile, (col * SIZE, (sheet_index * 4 + row) * SIZE))
     for offset,kind in [(32,"road"),(48,"access"),(64,"sidewalk")]:
