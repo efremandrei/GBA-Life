@@ -374,6 +374,8 @@
     }
   });
   document.getElementById("aboutButton").addEventListener("click", () => modal.classList.remove("hidden"));
+document.getElementById("aboutEmail").addEventListener("click", () => { if (window.NativeEditor) NativeEditor.emailDeveloper(); });
+document.getElementById("aboutRepo").addEventListener("click", () => { if (window.NativeEditor) NativeEditor.openRepository(); });
   document.getElementById("closeAbout").addEventListener("click", () => modal.classList.add("hidden"));
   window.editorBack = () => {
     if (modal.classList.contains("hidden")) return false;
