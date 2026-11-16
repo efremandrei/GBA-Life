@@ -32,6 +32,18 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void exitGame() {
             runOnUiThread(() -> finish());
         }
+        @JavascriptInterface public void openRepository() {
+            runOnUiThread(() -> {
+                try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/efremandrei/GBA-Life"))); }
+                catch (android.content.ActivityNotFoundException ignored) {}
+            });
+        }
+        @JavascriptInterface public void emailDeveloper() {
+            runOnUiThread(() -> {
+                try { startActivity(new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:andrei.efr@gmail.com"))); }
+                catch (android.content.ActivityNotFoundException ignored) {}
+            });
+        }
     }
 
     @Override public void onCreate(Bundle state) {
