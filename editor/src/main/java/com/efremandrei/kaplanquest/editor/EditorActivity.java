@@ -32,6 +32,20 @@ public final class EditorActivity extends Activity {
             });
         }
 
+        @JavascriptInterface public void openRepository() {
+            runOnUiThread(() -> {
+                try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/efremandrei/GBA-Life"))); }
+                catch (android.content.ActivityNotFoundException ignored) {}
+            });
+        }
+
+        @JavascriptInterface public void emailDeveloper() {
+            runOnUiThread(() -> {
+                try { startActivity(new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:andrei.efr@gmail.com"))); }
+                catch (android.content.ActivityNotFoundException ignored) {}
+            });
+        }
+
         @JavascriptInterface public void exportMap(String json) {
             if (json == null || json.length() > 1000000) {
                 tellEditor("Map is too large to export.");
