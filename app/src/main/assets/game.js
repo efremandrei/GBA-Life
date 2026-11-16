@@ -1311,7 +1311,9 @@
     event.stopPropagation();
     exitGame();
   });
-  document.getElementById("closeAboutButton").addEventListener("click", () => {
+  document.getElementById("aboutEmailButton").addEventListener("click", () => { if (window.NativeGame) NativeGame.emailDeveloper(); });
+document.getElementById("aboutRepoButton").addEventListener("click", () => { if (window.NativeGame) NativeGame.openRepository(); });
+document.getElementById("closeAboutButton").addEventListener("click", () => {
     aboutOverlay.classList.add("hidden");
   });
   function closeMenu() {
